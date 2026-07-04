@@ -1,0 +1,133 @@
+@import url('https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700;800&family=Inter:wght@300;400;500;600;700;800&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    background-color: #FFF8F9;
+    color: #1E1E1E;
+    font-family: 'Geist', 'Inter', system-ui, -apple-system, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+  }
+
+  /* Reset #root created by vite template */
+  #root {
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+    text-align: left !important;
+    display: block !important;
+    min-height: 100vh !important;
+    background-color: #FFF8F9;
+  }
+}
+
+/* Custom transitions and scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #FFF8F9;
+}
+::-webkit-scrollbar-thumb {
+  background: #F2E6EA;
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #AD56C4;
+}
+
+/* Leaflet Map Styles Customization */
+.leaflet-container {
+  width: 100%;
+  height: 100%;
+  background-color: #FFF8F9 !important;
+  font-family: inherit;
+  border-radius: 20px;
+}
+
+.leaflet-bar {
+  border: 1px solid #F2E6EA !important;
+  box-shadow: 0 4px 20px -2px rgba(242, 230, 234, 0.8) !important;
+  border-radius: 8px !important;
+  overflow: hidden;
+}
+
+.leaflet-bar a {
+  background-color: #FFFFFF !important;
+  color: #1E1E1E !important;
+  border-bottom: 1px solid #F2E6EA !important;
+  transition: all 0.2s ease;
+}
+
+.leaflet-bar a:hover {
+  background-color: #F8EEFA !important;
+  color: #AD56C4 !important;
+}
+
+/* Custom Marker Styling */
+.custom-map-marker {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+/* Animation utilities for the scanner */
+@keyframes scan-line {
+  0% {
+    top: 5%;
+  }
+  50% {
+    top: 95%;
+  }
+  100% {
+    top: 5%;
+  }
+}
+
+.animate-scan {
+  animation: scan-line 3s infinite linear;
+}
+
+/* Blob Animation for Hero */
+@keyframes blob-drift {
+  0% {
+    transform: translate(0px, 0px) scale(1);
+  }
+  33% {
+    transform: translate(30px, -50px) scale(1.1);
+  }
+  66% {
+    transform: translate(-20px, 20px) scale(0.9);
+  }
+  100% {
+    transform: translate(0px, 0px) scale(1);
+  }
+}
+
+.animate-blob {
+  animation: blob-drift 20s infinite alternate ease-in-out;
+}
+
+/* Subtle Shimmer for Loading Skeletons */
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.shimmer-loader {
+  background: linear-gradient(90deg, #F2E6EA 25%, #fcf4f6 37%, #F2E6EA 63%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite linear;
+}
