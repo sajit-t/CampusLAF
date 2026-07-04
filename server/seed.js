@@ -1,4 +1,3 @@
-import bcrypt from 'bcryptjs';
 import { db } from './db.js';
 
 const firstNames = [
@@ -41,9 +40,7 @@ const profilePics = [
 ];
 
 async function seed() {
-  console.log('Starting Seeding Process...');
-
-  const passwordHash = bcrypt.hashSync('Password123', 10);
+  console.log('Starting Clean Seeding Process...');
 
   // 1. Create Default Sajit Student
   const sajitRoll = '984512';
@@ -64,46 +61,7 @@ async function seed() {
     console.log('Created Student: Sajit Kumar');
   }
 
-  // Create login profiles
-  const profileSajit = await db.profiles.findByEmail('sajit@campus.edu');
-  if (!profileSajit) {
-    await db.profiles.create({
-      id: '00000000-0000-0000-0000-000000000111',
-      email: 'sajit@campus.edu',
-      password_hash: passwordHash,
-      roll_number: sajitRoll,
-      role: 'student'
-    });
-    console.log('Created Auth Profile for Sajit (Student)');
-  }
-
-  // 2. Create Default Admin Profile
-  const profileAdmin = await db.profiles.findByEmail('admin@campus.edu');
-  if (!profileAdmin) {
-    await db.profiles.create({
-      id: '00000000-0000-0000-0000-000000000222',
-      email: 'admin@campus.edu',
-      password_hash: passwordHash,
-      roll_number: null,
-      role: 'admin'
-    });
-    console.log('Created Auth Profile for Admin (admin@campus.edu)');
-  }
-
-  // 3. Create Default Super Admin Profile
-  const profileSuperAdmin = await db.profiles.findByEmail('superadmin@campus.edu');
-  if (!profileSuperAdmin) {
-    await db.profiles.create({
-      id: '00000000-0000-0000-0000-000000000333',
-      email: 'superadmin@campus.edu',
-      password_hash: passwordHash,
-      roll_number: null,
-      role: 'super_admin'
-    });
-    console.log('Created Auth Profile for Super Admin (superadmin@campus.edu)');
-  }
-
-  // 4. Create Sarah student for matching
+  // 2. Create Default Sarah student for matching
   const sarahRoll = '887213';
   let studentSarah = await db.students.findByRoll(sarahRoll);
   if (!studentSarah) {
@@ -121,19 +79,8 @@ async function seed() {
     });
     console.log('Created Student: Sarah Chen');
   }
-  const profileSarah = await db.profiles.findByEmail('schen@campus.edu');
-  if (!profileSarah) {
-    await db.profiles.create({
-      id: '00000000-0000-0000-0000-000000000112',
-      email: 'schen@campus.edu',
-      password_hash: passwordHash,
-      roll_number: sarahRoll,
-      role: 'student'
-    });
-    console.log('Created Auth Profile for Sarah Chen');
-  }
 
-  // 5. Create Marcus student
+  // 3. Create Marcus student
   const marcusRoll = '445123';
   let studentMarcus = await db.students.findByRoll(marcusRoll);
   if (!studentMarcus) {
@@ -151,22 +98,11 @@ async function seed() {
     });
     console.log('Created Student: Marcus Miller');
   }
-  const profileMarcus = await db.profiles.findByEmail('mmiller@campus.edu');
-  if (!profileMarcus) {
-    await db.profiles.create({
-      id: '00000000-0000-0000-0000-000000000113',
-      email: 'mmiller@campus.edu',
-      password_hash: passwordHash,
-      roll_number: marcusRoll,
-      role: 'student'
-    });
-    console.log('Created Auth Profile for Marcus Miller');
-  }
 
-  // 6. Generate 600 realistic students
+  // 4. Generate 600 realistic students
   console.log('Generating 600 dummy students...');
   let seededCount = 0;
-  const emailsSet = new Set(['sajit@campus.edu', 'schen@campus.edu', 'mmiller@campus.edu', 'admin@campus.edu', 'superadmin@campus.edu']);
+  const emailsSet = new Set(['sajit@campus.edu', 'schen@campus.edu', 'mmiller@campus.edu']);
   const rollsSet = new Set([sajitRoll, sarahRoll, marcusRoll]);
   const registersSet = new Set(['20260984512', '20260887213', '20260445123']);
 
@@ -194,7 +130,7 @@ async function seed() {
     let email = `${fn.toLowerCase()}.${ln.toLowerCase()}@campus.edu`;
     let attempts = 0;
     while (emailsSet.has(email)) {
-      email = `${fn.toLowerCase()}.${ln.toLowerCase()}${Math.floor(Math.random() * 100)}@campus.edu`;
+      email = `${fn.toLowerCase()}.${ln.toLowerCase()}${Math.floor(Math.random() * 10)}@campus.edu`;
       attempts++;
       if (attempts > 5) break;
     }
@@ -219,66 +155,14 @@ async function seed() {
       active_status: true
     });
 
-    // Create auth profile for each student as well
-    await db.profiles.create({
-      email: email,
-      password_hash: passwordHash,
-      roll_number: roll,
-      role: 'student'
-    });
-
     seededCount++;
     if (seededCount % 100 === 0) {
       console.log(`Seeded ${seededCount} students...`);
     }
   }
 
-  // 7. Seed some sample lost and found items
-  const item1 = await db.items.create({
-    category: 'Electronics',
-    item_name: 'Space Gray MacBook Pro 14"',
-    brand: 'Apple',
-    color: 'Space Gray',
-    description: 'M2 Pro laptop. Has a sticker of a purple astronaut on the lid. Left inside a black laptop sleeve in the quiet study area.',
-    estimated_value: 1200,
-    found_location: 'Tech Plaza Library',
-    building: 'Main Library',
-    floor: 3,
-    room: 'Quiet Study Area',
-    found_date: '2026-06-25',
-    found_time: '10:30',
-    received_by_admin: '00000000-0000-0000-0000-000000000222',
-    status: 'Waiting for Owner',
-    notes: 'Turned in by library staff.',
-    images: ['https://images.unsplash.com/photo-1517336714731-489689fd1ca8?auto=format&fit=crop&w=600&q=80']
-  });
-
-  const item2 = await db.items.create({
-    category: 'Personal Items',
-    item_name: 'Hydro Flask Water Bottle',
-    brand: 'Hydro Flask',
-    color: 'Oat',
-    description: '32oz wide mouth bottle with a flex cap. Has a minor dent on the bottom rim and a sticker of Yosemite National Park.',
-    estimated_value: 40,
-    found_location: 'University Gym',
-    building: 'Athletic Center',
-    floor: 1,
-    room: 'Locker Rooms',
-    found_date: '2026-06-27',
-    found_time: '15:45',
-    received_by_admin: '00000000-0000-0000-0000-000000000222',
-    status: 'Waiting for Owner',
-    notes: 'Found in Locker 45.',
-    images: ['https://images.unsplash.com/photo-1602143407151-7111542de6e8?auto=format&fit=crop&w=600&q=80']
-  });
-
-  console.log('Seeding Complete!');
-  console.log(`Total students seeded: ${seededCount + 3}`);
-  console.log('Login credentials:');
-  console.log(' - Student: sajit@campus.edu (Roll: 984512) | Password123');
-  console.log(' - Student: schen@campus.edu (Roll: 887213) | Password123');
-  console.log(' - Admin: admin@campus.edu | Password123');
-  console.log(' - Super Admin: superadmin@campus.edu | Password123');
+  console.log('Seeding Complete! Student database populated successfully.');
+  console.log(`Total students in database: ${seededCount + 3}`);
 }
 
 seed().catch(err => {

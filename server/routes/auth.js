@@ -90,4 +90,74 @@ router.get('/me', authenticateToken, async (req, res) => {
   }
 });
 
+// 3. Register / Create Account Endpoint
+router.post('/register', async (req, res) => {
+  const { role, email, password, rollNumber, adminCode } = req.body;
+
+  if (!role || !password) {
+    return res.status(400).json({ error: 'Role and password are required' });
+  }
+
+  try {
+    if (role === 'student') {
+      if (!rollNumber) {
+        return res.status(400).json({ error: 'Roll number is required for students' });
+      }
+      
+      const student = await db.students.findByRoll(rollNumber.trim());
+      if (!student) {
+        return res.status(404).json({ error: 'Student Roll Number not found in campus database. Please contact Admin.' });
+      }
+
+      // Check if profile already exists
+      const existingProfile = await db.profiles.findByEmail(student.college_email.toLowerCase());
+      if (existingProfile) {
+        return res.status(409).json({ error: 'An account has already been registered for this student email.' });
+      }
+
+      // Create new profile mapped to student roll number
+      const passwordHash = bcrypt.hashSync(password, 10);
+      await db.profiles.create({
+        email: student.college_email.toLowerCase(),
+        password_hash: passwordHash,
+        roll_number: rollNumber.trim(),
+        role: 'student'
+      });
+
+      return res.status(201).json({ message: 'Account successfully registered! You can now log in.' });
+
+    } else if (role === 'admin' || role === 'super_admin') {
+      if (!email || !adminCode) {
+        return res.status(400).json({ error: 'Email and Admin Registration Code are required' });
+      }
+
+      // Predefined admin register code
+      if (adminCode !== 'Admin2026') {
+        return res.status(403).json({ error: 'Invalid admin registration authorization code' });
+      }
+
+      const existingProfile = await db.profiles.findByEmail(email.trim().toLowerCase());
+      if (existingProfile) {
+        return res.status(409).json({ error: 'This email is already registered.' });
+      }
+
+      const passwordHash = bcrypt.hashSync(password, 10);
+      await db.profiles.create({
+        email: email.trim().toLowerCase(),
+        password_hash: passwordHash,
+        roll_number: null,
+        role: role
+      });
+
+      return res.status(201).json({ message: 'Admin account created successfully! You can now log in.' });
+
+    } else {
+      return res.status(400).json({ error: 'Invalid user registration role.' });
+    }
+  } catch (error) {
+    console.error('Registration API error:', error);
+    res.status(500).json({ error: 'Server error occurred during account creation' });
+  }
+});
+
 export default router;

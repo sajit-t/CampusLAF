@@ -95,6 +95,7 @@ interface AppContextType {
 
   // API Call actions
   login: (email: string, password: string) => Promise<boolean>;
+  register: (payload: any) => Promise<boolean>;
   logout: () => void;
   fetchItems: (searchQuery?: string) => Promise<void>;
   fetchClaims: () => Promise<void>;
@@ -221,6 +222,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setActiveStudent(data.user.student);
       }
       setPage('dashboard');
+      return true;
+    } catch (err: any) {
+      setErrorMsg(err.message);
+      return false;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const register = async (payload: any): Promise<boolean> => {
+    setIsLoading(true);
+    setErrorMsg(null);
+    try {
+      await apiRequest('/api/auth/register', 'POST', payload);
       return true;
     } catch (err: any) {
       setErrorMsg(err.message);
@@ -487,6 +502,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setSelectedItemId,
       clearError,
       login,
+      register,
       logout,
       fetchItems,
       fetchClaims,

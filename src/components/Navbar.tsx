@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { motion, AnimatePresence } from 'framer-motion';
-import { LayoutDashboard, ShieldCheck, LogOut, Sparkles, Lock, Mail } from 'lucide-react';
+import { LayoutDashboard, ShieldCheck, LogOut, Lock, Mail, Hash, Key } from 'lucide-react';
 
 export const Navbar: React.FC = () => {
   const {
@@ -10,6 +10,7 @@ export const Navbar: React.FC = () => {
     currentUser,
     activeStudent,
     login,
+    register,
     logout,
     errorMsg,
     clearError
@@ -23,6 +24,25 @@ export const Navbar: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [authError, setAuthError] = useState('');
+  const [successMsg, setSuccessMsg] = useState('');
+
+  // Registration Form states
+  const [isRegisterMode, setIsRegisterMode] = useState(false);
+  const [registerRole, setRegisterRole] = useState<'student' | 'admin' | 'super_admin'>('student');
+  const [rollNumber, setRollNumber] = useState('');
+  const [adminCode, setAdminCode] = useState('');
+
+  const resetForm = () => {
+    setEmail('');
+    setPassword('');
+    setRollNumber('');
+    setAdminCode('');
+    setIsRegisterMode(false);
+    setSuccessMsg('');
+    setRegisterRole('student');
+    setAuthError('');
+    clearError();
+  };
 
   useEffect(() => {
     const handleScroll = () => {
@@ -52,25 +72,47 @@ export const Navbar: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email || !password) {
-      setAuthError('Please enter both email and password.');
-      return;
-    }
+    setAuthError('');
+    setSuccessMsg('');
 
-    const success = await login(email, password);
-    if (success) {
-      setShowLoginModal(false);
-      setEmail('');
-      setPassword('');
-      clearError();
-    }
-  };
+    if (isRegisterMode) {
+      if (registerRole === 'student') {
+        if (!rollNumber || !password) {
+          setAuthError('Please enter both roll number and password.');
+          return;
+        }
+        const success = await register({ role: 'student', rollNumber, password });
+        if (success) {
+          setSuccessMsg('Account registered successfully! You can now sign in.');
+          setIsRegisterMode(false);
+          setRollNumber('');
+          setPassword('');
+        }
+      } else {
+        if (!email || !password || !adminCode) {
+          setAuthError('Please fill in email, password, and admin registration code.');
+          return;
+        }
+        const success = await register({ role: registerRole, email, password, adminCode });
+        if (success) {
+          setSuccessMsg('Admin account created successfully! You can now sign in.');
+          setIsRegisterMode(false);
+          setEmail('');
+          setPassword('');
+          setAdminCode('');
+        }
+      }
+    } else {
+      if (!email || !password) {
+        setAuthError('Please enter both email and password.');
+        return;
+      }
 
-  const triggerQuickLogin = async (roleEmail: string) => {
-    const success = await login(roleEmail, 'Password123');
-    if (success) {
-      setShowLoginModal(false);
-      clearError();
+      const success = await login(email, password);
+      if (success) {
+        setShowLoginModal(false);
+        resetForm();
+      }
     }
   };
 
@@ -229,7 +271,7 @@ export const Navbar: React.FC = () => {
               exit={{ opacity: 0 }}
               onClick={() => {
                 setShowLoginModal(false);
-                clearError();
+                resetForm();
               }}
               className="absolute inset-0 bg-neutral-950/40 backdrop-blur-sm"
             />
@@ -243,13 +285,15 @@ export const Navbar: React.FC = () => {
             >
               <div className="text-left space-y-1.5">
                 <span className="text-[10px] font-sans font-extrabold uppercase tracking-wider px-3 py-1 rounded-full bg-primary-light text-primary">
-                  Identity Gateway
+                  {isRegisterMode ? 'Account Creation' : 'Identity Gateway'}
                 </span>
                 <h3 className="font-sans font-extrabold text-2xl text-textMain tracking-tight">
-                  University Authentication
+                  {isRegisterMode ? 'Register Account' : 'University Authentication'}
                 </h3>
                 <p className="text-xs text-textMuted">
-                  Log in to access claim requests, student dashboards, and reporting interfaces.
+                  {isRegisterMode
+                    ? 'Register your profile to claim lost items or manage campus return reports.'
+                    : 'Log in to access claim requests, student dashboards, and reporting interfaces.'}
                 </p>
               </div>
 
@@ -259,69 +303,175 @@ export const Navbar: React.FC = () => {
                 </div>
               )}
 
-              <form onSubmit={handleSubmit} className="space-y-4 text-left">
-                <div className="space-y-1">
-                  <label className="text-[11px] font-bold text-textMain uppercase tracking-wider">College Email</label>
-                  <div className="relative">
-                    <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 text-textMuted" size={14} />
-                    <input
-                      type="email"
-                      placeholder="e.g. sajit@campus.edu"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      className="w-full pl-10 pr-4 py-2.5 text-xs bg-white border border-borderMain rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
-                    />
-                  </div>
+              {successMsg && (
+                <div className="p-3 bg-emerald-50 border border-emerald-100 rounded-xl text-left text-[11px] text-emerald-600 font-medium">
+                  {successMsg}
                 </div>
+              )}
 
-                <div className="space-y-1">
-                  <label className="text-[11px] font-bold text-textMain uppercase tracking-wider">Password</label>
-                  <div className="relative">
-                    <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 text-textMuted" size={14} />
-                    <input
-                      type="password"
-                      placeholder="••••••••"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      className="w-full pl-10 pr-4 py-2.5 text-xs bg-white border border-borderMain rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
-                    />
-                  </div>
-                </div>
+              <form onSubmit={handleSubmit} className="space-y-4 text-left">
+                {isRegisterMode ? (
+                  <>
+                    {/* Role tabs */}
+                    <div className="grid grid-cols-2 gap-2 p-1 bg-bgMain rounded-xl border border-borderMain/50">
+                      <button
+                        type="button"
+                        onClick={() => setRegisterRole('student')}
+                        className={`py-1.5 rounded-lg text-xs font-bold transition-all ${
+                          registerRole === 'student'
+                            ? 'bg-white shadow text-primary'
+                            : 'text-textMuted hover:text-textMain'
+                        }`}
+                      >
+                        Student
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setRegisterRole('admin')}
+                        className={`py-1.5 rounded-lg text-xs font-bold transition-all ${
+                          registerRole !== 'student'
+                            ? 'bg-white shadow text-accent'
+                            : 'text-textMuted hover:text-textMain'
+                        }`}
+                      >
+                        Staff/Admin
+                      </button>
+                    </div>
+
+                    {registerRole === 'student' ? (
+                      <div className="space-y-1">
+                        <label className="text-[11px] font-bold text-textMain uppercase tracking-wider">Student Roll Number</label>
+                        <div className="relative">
+                          <Hash className="absolute left-3.5 top-1/2 -translate-y-1/2 text-textMuted" size={14} />
+                          <input
+                            type="text"
+                            placeholder="e.g. 984512"
+                            value={rollNumber}
+                            onChange={(e) => setRollNumber(e.target.value)}
+                            className="w-full pl-10 pr-4 py-2.5 text-xs bg-white border border-borderMain rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
+                            required
+                          />
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="space-y-1">
+                          <label className="text-[11px] font-bold text-textMain uppercase tracking-wider">Role</label>
+                          <select
+                            value={registerRole}
+                            onChange={(e) => setRegisterRole(e.target.value as any)}
+                            className="w-full px-3 py-2 text-xs bg-white border border-borderMain rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20"
+                          >
+                            <option value="admin">Security Officer (Admin)</option>
+                            <option value="super_admin">Super Administrator</option>
+                          </select>
+                        </div>
+
+                        <div className="space-y-1">
+                          <label className="text-[11px] font-bold text-textMain uppercase tracking-wider">College Email</label>
+                          <div className="relative">
+                            <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 text-textMuted" size={14} />
+                            <input
+                              type="email"
+                              placeholder="e.g. officer@campus.edu"
+                              value={email}
+                              onChange={(e) => setEmail(e.target.value)}
+                              className="w-full pl-10 pr-4 py-2.5 text-xs bg-white border border-borderMain rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
+                              required
+                            />
+                          </div>
+                        </div>
+                      </>
+                    )}
+
+                    <div className="space-y-1">
+                      <label className="text-[11px] font-bold text-textMain uppercase tracking-wider">Choose Password</label>
+                      <div className="relative">
+                        <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 text-textMuted" size={14} />
+                        <input
+                          type="password"
+                          placeholder="••••••••"
+                          value={password}
+                          onChange={(e) => setPassword(e.target.value)}
+                          className="w-full pl-10 pr-4 py-2.5 text-xs bg-white border border-borderMain rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
+                          required
+                        />
+                      </div>
+                    </div>
+
+                    {registerRole !== 'student' && (
+                      <div className="space-y-1">
+                        <label className="text-[11px] font-bold text-textMain uppercase tracking-wider">Admin Authorization Code</label>
+                        <div className="relative">
+                          <Key className="absolute left-3.5 top-1/2 -translate-y-1/2 text-textMuted" size={14} />
+                          <input
+                            type="text"
+                            placeholder="Enter Code (e.g. Admin2026)"
+                            value={adminCode}
+                            onChange={(e) => setAdminCode(e.target.value)}
+                            className="w-full pl-10 pr-4 py-2.5 text-xs bg-white border border-borderMain rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
+                            required
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <div className="space-y-1">
+                      <label className="text-[11px] font-bold text-textMain uppercase tracking-wider">College Email</label>
+                      <div className="relative">
+                        <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 text-textMuted" size={14} />
+                        <input
+                          type="email"
+                          placeholder="e.g. student.name@campus.edu"
+                          value={email}
+                          onChange={(e) => setEmail(e.target.value)}
+                          className="w-full pl-10 pr-4 py-2.5 text-xs bg-white border border-borderMain rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
+                          required
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[11px] font-bold text-textMain uppercase tracking-wider">Password</label>
+                      <div className="relative">
+                        <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 text-textMuted" size={14} />
+                        <input
+                          type="password"
+                          placeholder="••••••••"
+                          value={password}
+                          onChange={(e) => setPassword(e.target.value)}
+                          className="w-full pl-10 pr-4 py-2.5 text-xs bg-white border border-borderMain rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
+                          required
+                        />
+                      </div>
+                    </div>
+                  </>
+                )}
 
                 <button
                   type="submit"
                   className="w-full py-3 bg-primary hover:bg-primary-hover text-white text-xs font-bold rounded-xl shadow-md transition-all hover:scale-102 mt-2"
                 >
-                  Sign In
+                  {isRegisterMode ? 'Create Account' : 'Sign In'}
                 </button>
               </form>
 
-              {/* DEMO SHORTCUT QUICK-LOGINS */}
-              <div className="pt-4 border-t border-borderMain/50 text-left space-y-3">
-                <div className="flex items-center gap-1.5 text-[10px] font-bold text-textMuted uppercase tracking-wider">
-                  <Sparkles size={12} className="text-primary" />
-                  <span>Reviewer Demo Shortcuts</span>
-                </div>
-                <div className="grid grid-cols-3 gap-2">
-                  <button
-                    onClick={() => triggerQuickLogin('sajit@campus.edu')}
-                    className="py-2 px-2 bg-primary-light/50 hover:bg-primary-light border border-primary/10 rounded-xl text-[10px] font-bold text-primary transition-all text-center"
-                  >
-                    Sajit (Student)
-                  </button>
-                  <button
-                    onClick={() => triggerQuickLogin('admin@campus.edu')}
-                    className="py-2 px-2 bg-[#FFF0F2] hover:bg-[#FFE0E4] border border-[#FF8DA1]/10 rounded-xl text-[10px] font-bold text-accent transition-all text-center"
-                  >
-                    Office Admin
-                  </button>
-                  <button
-                    onClick={() => triggerQuickLogin('superadmin@campus.edu')}
-                    className="py-2 px-2 bg-emerald-50 hover:bg-emerald-100 border border-emerald-100 rounded-xl text-[10px] font-bold text-emerald-600 transition-all text-center"
-                  >
-                    Super Admin
-                  </button>
-                </div>
+              <div className="text-center pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsRegisterMode(!isRegisterMode);
+                    setAuthError('');
+                    setSuccessMsg('');
+                  }}
+                  className="text-xs text-primary hover:underline font-medium"
+                >
+                  {isRegisterMode
+                    ? 'Already have an account? Sign in instead.'
+                    : "Don't have an account? Create one now."}
+                </button>
               </div>
             </motion.div>
           </div>
