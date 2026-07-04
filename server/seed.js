@@ -68,7 +68,7 @@ async function seed() {
   const profileSajit = await db.profiles.findByEmail('sajit@campus.edu');
   if (!profileSajit) {
     await db.profiles.create({
-      id: 'student-sajit-uuid-111',
+      id: '00000000-0000-0000-0000-000000000111',
       email: 'sajit@campus.edu',
       password_hash: passwordHash,
       roll_number: sajitRoll,
@@ -81,7 +81,7 @@ async function seed() {
   const profileAdmin = await db.profiles.findByEmail('admin@campus.edu');
   if (!profileAdmin) {
     await db.profiles.create({
-      id: 'admin-uuid-222',
+      id: '00000000-0000-0000-0000-000000000222',
       email: 'admin@campus.edu',
       password_hash: passwordHash,
       roll_number: null,
@@ -94,7 +94,7 @@ async function seed() {
   const profileSuperAdmin = await db.profiles.findByEmail('superadmin@campus.edu');
   if (!profileSuperAdmin) {
     await db.profiles.create({
-      id: 'super-admin-uuid-333',
+      id: '00000000-0000-0000-0000-000000000333',
       email: 'superadmin@campus.edu',
       password_hash: passwordHash,
       roll_number: null,
@@ -124,7 +124,7 @@ async function seed() {
   const profileSarah = await db.profiles.findByEmail('schen@campus.edu');
   if (!profileSarah) {
     await db.profiles.create({
-      id: 'student-sarah-uuid-112',
+      id: '00000000-0000-0000-0000-000000000112',
       email: 'schen@campus.edu',
       password_hash: passwordHash,
       roll_number: sarahRoll,
@@ -154,7 +154,7 @@ async function seed() {
   const profileMarcus = await db.profiles.findByEmail('mmiller@campus.edu');
   if (!profileMarcus) {
     await db.profiles.create({
-      id: 'student-marcus-uuid-113',
+      id: '00000000-0000-0000-0000-000000000113',
       email: 'mmiller@campus.edu',
       password_hash: passwordHash,
       roll_number: marcusRoll,
@@ -247,7 +247,7 @@ async function seed() {
     room: 'Quiet Study Area',
     found_date: '2026-06-25',
     found_time: '10:30',
-    received_by_admin: 'admin-uuid-222',
+    received_by_admin: '00000000-0000-0000-0000-000000000222',
     status: 'Waiting for Owner',
     notes: 'Turned in by library staff.',
     images: ['https://images.unsplash.com/photo-1517336714731-489689fd1ca8?auto=format&fit=crop&w=600&q=80']
@@ -266,7 +266,7 @@ async function seed() {
     room: 'Locker Rooms',
     found_date: '2026-06-27',
     found_time: '15:45',
-    received_by_admin: 'admin-uuid-222',
+    received_by_admin: '00000000-0000-0000-0000-000000000222',
     status: 'Waiting for Owner',
     notes: 'Found in Locker 45.',
     images: ['https://images.unsplash.com/photo-1602143407151-7111542de6e8?auto=format&fit=crop&w=600&q=80']
