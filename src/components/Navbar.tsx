@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { motion, AnimatePresence } from 'framer-motion';
-import { LayoutDashboard, ShieldCheck, LogOut, Lock, Mail, Hash, Key } from 'lucide-react';
+import { LayoutDashboard, ShieldCheck, LogOut, Lock, Mail, Hash, Key, Home, Search, FileText, MapPin, Clock, Phone } from 'lucide-react';
 
 export const Navbar: React.FC = () => {
   const {
@@ -13,12 +13,17 @@ export const Navbar: React.FC = () => {
     register,
     logout,
     errorMsg,
-    clearError
+    clearError,
+    adminActiveTab,
+    setAdminActiveTab,
+    showLoginModal,
+    setShowLoginModal,
+    showReportGuidance,
+    setShowReportGuidance
   } = useApp();
 
   const [isScrolled, setIsScrolled] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
-  const [showLoginModal, setShowLoginModal] = useState(false);
 
   // Form states
   const [email, setEmail] = useState('');
@@ -60,15 +65,6 @@ export const Navbar: React.FC = () => {
     }
   }, [errorMsg]);
 
-  const handleNavClick = (page: string) => {
-    // Check auth guards
-    if (!currentUser && page !== 'landing') {
-      setShowLoginModal(true);
-      return;
-    }
-    setPage(page);
-    setShowProfileMenu(false);
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -117,11 +113,75 @@ export const Navbar: React.FC = () => {
   };
 
   const navItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { 
+      id: 'landing', 
+      label: 'Home', 
+      icon: Home, 
+      isActive: currentPage === 'landing', 
+      action: () => setPage('landing') 
+    },
+    { 
+      id: 'browse', 
+      label: 'Browse Items', 
+      icon: Search, 
+      isActive: currentPage === 'dashboard', 
+      action: () => {
+        if (!currentUser) {
+          clearError();
+          setShowLoginModal(true);
+        } else {
+          setPage('dashboard');
+        }
+      } 
+    },
+    { 
+      id: 'report', 
+      label: 'Report Item', 
+      icon: FileText, 
+      isActive: currentPage === 'admin' && adminActiveTab === 'receive', 
+      action: () => {
+        if (!currentUser) {
+          clearError();
+          setShowLoginModal(true);
+        } else if (['admin', 'super_admin'].includes(currentUser.role)) {
+          setAdminActiveTab('receive');
+          setPage('admin');
+        } else {
+          setShowReportGuidance(true);
+        }
+      } 
+    }
   ];
 
-  if (currentUser && ['admin', 'super_admin'].includes(currentUser.role)) {
-    navItems.push({ id: 'admin', label: 'Admin Portal', icon: ShieldCheck });
+  if (currentUser) {
+    if (['admin', 'super_admin'].includes(currentUser.role)) {
+      navItems.push({ 
+        id: 'admin', 
+        label: 'Admin Portal', 
+        icon: ShieldCheck, 
+        isActive: currentPage === 'admin' && adminActiveTab !== 'receive', 
+        action: () => setPage('admin') 
+      });
+    } else {
+      navItems.push({ 
+        id: 'dashboard', 
+        label: 'Dashboard', 
+        icon: LayoutDashboard, 
+        isActive: currentPage === 'dashboard', 
+        action: () => setPage('dashboard') 
+      });
+    }
+  } else {
+    navItems.push({ 
+      id: 'login', 
+      label: 'Login', 
+      icon: Lock, 
+      isActive: showLoginModal, 
+      action: () => {
+        clearError();
+        setShowLoginModal(true);
+      } 
+    });
   }
 
   return (
@@ -139,7 +199,7 @@ export const Navbar: React.FC = () => {
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           {/* Logo */}
           <div 
-            onClick={() => handleNavClick('landing')}
+            onClick={() => setPage('landing')}
             className="flex items-center gap-2 cursor-pointer group"
           >
             <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-primary to-accent flex items-center justify-center shadow-md shadow-primary/10 transition-transform duration-300 group-hover:scale-105 group-hover:rotate-3">
@@ -151,33 +211,31 @@ export const Navbar: React.FC = () => {
           </div>
 
           {/* Center Nav Links */}
-          {currentUser && (
-            <nav className="hidden md:flex items-center gap-1 bg-white border border-borderMain/60 px-2 py-1.5 rounded-full shadow-soft">
-              {navItems.map((item) => {
-                const isActive = currentPage === item.id;
-                const Icon = item.icon;
-                return (
-                  <button
-                    key={item.id}
-                    onClick={() => handleNavClick(item.id)}
-                    className={`relative px-4 py-2 rounded-full font-sans text-sm font-medium transition-colors duration-200 flex items-center gap-1.5 ${
-                      isActive ? 'text-primary' : 'text-textMuted hover:text-textMain'
-                    }`}
-                  >
-                    {isActive && (
-                      <motion.div
-                        layoutId="active-nav"
-                        className="absolute inset-0 bg-primary-light rounded-full -z-10"
-                        transition={{ type: 'spring', stiffness: 380, damping: 30 }}
-                      />
-                    )}
-                    <Icon size={16} />
-                    {item.label}
-                  </button>
-                );
-              })}
-            </nav>
-          )}
+          <nav className="hidden md:flex items-center gap-1 bg-white border border-borderMain/60 px-2 py-1.5 rounded-full shadow-soft">
+            {navItems.map((item) => {
+              const isActive = item.isActive;
+              const Icon = item.icon;
+              return (
+                <button
+                  key={item.id}
+                  onClick={item.action}
+                  className={`relative px-4 py-2 rounded-full font-sans text-sm font-medium transition-colors duration-200 flex items-center gap-1.5 ${
+                    isActive ? 'text-primary' : 'text-textMuted hover:text-textMain'
+                  }`}
+                >
+                  {isActive && (
+                    <motion.div
+                      layoutId="active-nav"
+                      className="absolute inset-0 bg-primary-light rounded-full -z-10"
+                      transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+                    />
+                  )}
+                  <Icon size={16} />
+                  {item.label}
+                </button>
+              );
+            })}
+          </nav>
 
           {/* Action Controls / Profile */}
           <div className="flex items-center gap-3">
@@ -250,7 +308,13 @@ export const Navbar: React.FC = () => {
             {/* Mobile Nav Button */}
             {currentUser && (
               <button 
-                onClick={() => handleNavClick('dashboard')}
+                onClick={() => {
+                  if (['admin', 'super_admin'].includes(currentUser.role)) {
+                    setPage('admin');
+                  } else {
+                    setPage('dashboard');
+                  }
+                }}
                 className="md:hidden w-9 h-9 rounded-full bg-white border border-borderMain flex items-center justify-center text-textMuted hover:text-primary hover:scale-105 transition-all"
               >
                 <LayoutDashboard size={18} />
@@ -473,6 +537,83 @@ export const Navbar: React.FC = () => {
                     : "Don't have an account? Create one now."}
                 </button>
               </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* STUDENT REPORT GUIDANCE MODAL */}
+      <AnimatePresence>
+        {showReportGuidance && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowReportGuidance(false)}
+              className="absolute inset-0 bg-neutral-950/40 backdrop-blur-sm"
+            />
+
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="relative w-full max-w-md bg-white border border-borderMain rounded-3xl p-6 md:p-8 shadow-premium text-center z-10 space-y-6"
+            >
+              <div className="text-left space-y-2">
+                <span className="text-[10px] font-sans font-extrabold uppercase tracking-wider px-3 py-1 rounded-full bg-amber-50 text-amber-600 border border-amber-100/50">
+                  Campus Policy Guide
+                </span>
+                <h3 className="font-sans font-extrabold text-2xl text-textMain tracking-tight">
+                  How to Report Items
+                </h3>
+                <p className="text-xs text-textMuted leading-relaxed">
+                  For security and record compliance, all lost and found items must be registered at the physical safety office.
+                </p>
+              </div>
+
+              <div className="bg-bgMain rounded-2xl border border-borderMain/50 p-4 text-left space-y-3.5 text-xs text-textMain font-medium">
+                <div className="flex gap-2.5 items-start">
+                  <MapPin size={16} className="text-primary shrink-0 mt-0.5" />
+                  <div>
+                    <p className="font-bold text-textMain leading-tight">Safety Office Location</p>
+                    <p className="text-[11px] text-textMuted mt-0.5">IT Block, Ground Floor, Room 102</p>
+                  </div>
+                </div>
+
+                <div className="flex gap-2.5 items-start">
+                  <Clock size={16} className="text-accent shrink-0 mt-0.5" />
+                  <div>
+                    <p className="font-bold text-textMain leading-tight">Operating Hours</p>
+                    <p className="text-[11px] text-textMuted mt-0.5">Monday – Friday, 9:00 AM – 5:00 PM</p>
+                  </div>
+                </div>
+
+                <div className="flex gap-2.5 items-start">
+                  <Phone size={16} className="text-emerald-500 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="font-bold text-textMain leading-tight">Direct Support Call</p>
+                    <p className="text-[11px] text-textMuted mt-0.5">+91 452 248 2240 (ext. 404)</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="text-xs text-textMuted text-left leading-relaxed bg-primary-light/30 border border-primary/10 rounded-xl p-3.5">
+                <p className="font-bold text-primary mb-1">💡 Instructions:</p>
+                <p className="leading-normal">
+                  <strong>Found an Item?</strong> Please bring it directly to the office. Staff will scan your ID barcode and log it.
+                </p>
+                <p className="leading-normal mt-1.5">
+                  <strong>Lost an Item?</strong> Search the Browse Catalog. Once located, click "File Claim Request" to lock the item for retrieval.
+                </p>
+              </div>
+
+              <button
+                onClick={() => setShowReportGuidance(false)}
+                className="w-full py-3.5 bg-primary hover:bg-primary-hover text-white text-xs font-bold rounded-xl shadow-md transition-all hover:scale-102"
+              >
+                I Understand
+              </button>
             </motion.div>
           </div>
         )}

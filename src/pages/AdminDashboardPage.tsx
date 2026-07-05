@@ -57,12 +57,10 @@ export const AdminDashboardPage: React.FC = () => {
     fetchStudentByRoll,
     registerItem,
     approveClaim,
-    rejectClaim
-  } = useApp();
-
-  const [activeView, setActiveView] = useState<'dashboard' | 'students' | 'receive' | 'claims' | 'reports' | 'logs' | 'settings'>('dashboard');
-
-  // Student CRUD states
+    rejectClaim,
+    adminActiveTab: activeView,
+    setAdminActiveTab: setActiveView
+  } = useApp();  // Student CRUD states
   const [studentSearch, setStudentSearch] = useState('');
   const [studentDept, setStudentDept] = useState('');
   const [studentYear, setStudentYear] = useState('');

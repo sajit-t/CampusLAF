@@ -87,6 +87,12 @@ interface AppContextType {
   selectedItemId: string | null;
   isLoading: boolean;
   errorMsg: string | null;
+  adminActiveTab: string;
+  setAdminActiveTab: (tab: string) => void;
+  showLoginModal: boolean;
+  setShowLoginModal: (show: boolean) => void;
+  showReportGuidance: boolean;
+  setShowReportGuidance: (show: boolean) => void;
 
   // Setters/Navigators
   setPage: (page: string) => void;
@@ -138,6 +144,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [adminActiveTab, setAdminActiveTab] = useState<string>('dashboard');
+  const [showLoginModal, setShowLoginModal] = useState<boolean>(false);
+  const [showReportGuidance, setShowReportGuidance] = useState<boolean>(false);
 
   // Helper fetch request
   const apiRequest = async (url: string, method = 'GET', body: any = null, isMultipart = false) => {
@@ -221,7 +230,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (data.user.role === 'student' && data.user.student) {
         setActiveStudent(data.user.student);
       }
-      setPage('dashboard');
+      if (['admin', 'super_admin'].includes(data.user.role)) {
+        setPage('admin');
+      } else {
+        setPage('dashboard');
+      }
       return true;
     } catch (err: any) {
       setErrorMsg(err.message);
@@ -498,6 +511,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       selectedItemId,
       isLoading,
       errorMsg,
+      adminActiveTab,
+      setAdminActiveTab,
+      showLoginModal,
+      setShowLoginModal,
+      showReportGuidance,
+      setShowReportGuidance,
       setPage,
       setSelectedItemId,
       clearError,

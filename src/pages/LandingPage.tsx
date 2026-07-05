@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useApp } from '../context/AppContext';
+import type { Item } from '../context/AppContext';
 import { FloatingObjects } from '../components/FloatingObjects';
 import { HowItWorks } from '../components/HowItWorks';
 import { motion, useInView } from 'framer-motion';
@@ -52,7 +53,14 @@ const CountUp: React.FC<{ end: number; duration?: number; suffix?: string }> = (
 };
 
 export const LandingPage: React.FC = () => {
-  const { setPage } = useApp();
+  const { 
+    currentUser, 
+    items,
+    setPage, 
+    setAdminActiveTab, 
+    setShowLoginModal, 
+    setShowReportGuidance 
+  } = useApp();
 
   const features = [
     {
@@ -121,6 +129,88 @@ export const LandingPage: React.FC = () => {
     }
   ];
 
+  const recentLostItems: Item[] = [
+    {
+      id: 'lost-1',
+      item_name: 'MacBook Pro 14" Space Grey',
+      category: 'Electronics',
+      found_location: 'Library Quiet Area (2nd Floor)',
+      found_date: '2026-07-04',
+      images: ['https://images.unsplash.com/photo-1517336714731-489689fd1ca8?auto=format&fit=crop&w=300&q=80'],
+      description: 'MacBook Pro in space grey color with stickers',
+      estimated_value: 0,
+      status: 'Waiting for Owner'
+    },
+    {
+      id: 'lost-2',
+      item_name: 'Black Leather Bifold Wallet',
+      category: 'Personal Items',
+      found_location: 'Main Dining Hall B',
+      found_date: '2026-07-03',
+      images: ['https://images.unsplash.com/photo-1627124357626-623f4c859424?auto=format&fit=crop&w=300&q=80'],
+      description: 'Leather wallet containing student ID cards',
+      estimated_value: 0,
+      status: 'Waiting for Owner'
+    },
+    {
+      id: 'lost-3',
+      item_name: 'Keys with Red Keychain & Fob',
+      category: 'Keys',
+      found_location: 'Mechanical Block Seminar Hall',
+      found_date: '2026-07-02',
+      images: ['https://images.unsplash.com/photo-1582139329536-e7284fece509?auto=format&fit=crop&w=300&q=80'],
+      description: 'Set of three keys with a red silicone keychain',
+      estimated_value: 0,
+      status: 'Waiting for Owner'
+    }
+  ];
+
+  const recentFoundItems: Item[] = [
+    {
+      id: 'found-1',
+      item_name: 'Sony WH-1000XM4 Headphones',
+      category: 'Electronics',
+      found_location: 'IT Block Room 302',
+      found_date: '2026-07-04',
+      images: ['https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&w=300&q=80'],
+      description: 'Black over-ear active noise cancelling headphones',
+      estimated_value: 0,
+      status: 'Waiting for Owner'
+    },
+    {
+      id: 'found-2',
+      item_name: 'Hydro Flask Cobalt Water Bottle',
+      category: 'Accessories',
+      found_location: 'Gymnasium Locker Room',
+      found_date: '2026-07-03',
+      images: ['https://images.unsplash.com/photo-1602143407151-7111542de6e8?auto=format&fit=crop&w=300&q=80'],
+      description: 'Blue vacuum insulated water bottle',
+      estimated_value: 0,
+      status: 'Waiting for Owner'
+    },
+    {
+      id: 'found-3',
+      item_name: 'Dell XPS 130W USB-C Charger',
+      category: 'Electronics',
+      found_location: 'Library Quiet Area (1st Floor)',
+      found_date: '2026-07-02',
+      images: ['https://images.unsplash.com/photo-1583863788434-e58a36330cf0?auto=format&fit=crop&w=300&q=80'],
+      description: 'USB-C black power adapter block',
+      estimated_value: 0,
+      status: 'Waiting for Owner'
+    }
+  ];
+
+  const lostList = currentUser && items.length > 0
+    ? items.filter(item => item.status === 'Waiting for Owner' || item.status === 'Claim Requested').slice(0, 3)
+    : recentLostItems;
+
+  const foundList = currentUser && items.length > 0
+    ? items.filter(item => item.status === 'Waiting for Owner').slice(3, 6).length > 0
+      ? items.filter(item => item.status === 'Waiting for Owner').slice(3, 6)
+      : items.filter(item => item.status === 'Waiting for Owner').slice(0, 3)
+    : recentFoundItems;
+
   return (
     <div className="min-h-screen flex flex-col pt-16">
       {/* 1. HERO SECTION */}
@@ -169,21 +259,32 @@ export const LandingPage: React.FC = () => {
           >
             <button
               onClick={() => {
-                setPage('dashboard');
-                window.scrollTo(0, 0);
+                if (!currentUser) {
+                  setShowLoginModal(true);
+                } else {
+                  setPage('dashboard');
+                  window.scrollTo(0, 0);
+                }
               }}
               className="px-8 py-3.5 rounded-2xl bg-primary hover:bg-primary-hover text-white font-sans text-sm font-semibold shadow-md hover:shadow-lg shadow-primary/10 transition-all hover:scale-[1.03] active:scale-[0.97]"
             >
-              Browse Lost Catalog
+              Browse Lost Items
             </button>
             <button
               onClick={() => {
-                setPage('admin');
-                window.scrollTo(0, 0);
+                if (!currentUser) {
+                  setShowLoginModal(true);
+                } else if (['admin', 'super_admin'].includes(currentUser.role)) {
+                  setAdminActiveTab('receive');
+                  setPage('admin');
+                  window.scrollTo(0, 0);
+                } else {
+                  setShowReportGuidance(true);
+                }
               }}
               className="px-8 py-3.5 rounded-2xl bg-white hover:bg-bgMain text-textMain font-sans text-sm font-semibold border border-borderMain hover:border-textMuted transition-all hover:scale-[1.03] active:scale-[0.97] flex items-center justify-center gap-1.5"
             >
-              Office Admin Access
+              Report Lost / Found Item
               <ArrowRight size={16} />
             </button>
           </motion.div>
@@ -195,10 +296,132 @@ export const LandingPage: React.FC = () => {
         </div>
       </section>
 
-      {/* 2. HOW IT WORKS SECTION */}
+      {/* 2. RECENT LOST ITEMS SECTION */}
+      <section className="py-20 px-4 bg-white border-b border-borderMain/50">
+        <div className="max-w-6xl mx-auto">
+          <div className="text-center max-w-2xl mx-auto mb-12">
+            <span className="text-xs uppercase tracking-widest font-extrabold text-primary bg-primary-light px-3.5 py-1.5 rounded-full">
+              Actively Lost Catalog
+            </span>
+            <h2 className="text-3xl font-sans font-bold text-textMain tracking-tight mt-4">
+              Recent Lost Items Reported
+            </h2>
+            <p className="text-sm text-textMuted mt-2">
+              Belongings reported lost by campus students waiting to be recovered.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+            {lostList.map((item) => (
+              <div
+                key={item.id}
+                onClick={() => {
+                  if (!currentUser) {
+                    setShowLoginModal(true);
+                  } else {
+                    setPage('dashboard');
+                    window.scrollTo(0, 0);
+                  }
+                }}
+                className="bg-bgMain border border-borderMain/60 rounded-2xl overflow-hidden shadow-soft hover:shadow-hover hover:-translate-y-1 transition-all cursor-pointer flex flex-col justify-between"
+              >
+                <div className="relative h-44 bg-borderMain/10">
+                  <img src={item.images[0]} alt={item.item_name} className="w-full h-full object-cover" />
+                  <span className="absolute top-3 right-3 text-[10px] font-extrabold px-2.5 py-0.5 rounded-full bg-primary-light text-primary border border-primary/10">
+                    LOST
+                  </span>
+                </div>
+                <div className="p-4 space-y-2 text-left">
+                  <span className="text-[9px] font-sans font-bold text-accent uppercase tracking-wider">{item.category}</span>
+                  <h4 className="font-sans font-bold text-sm text-textMain truncate leading-tight">{item.item_name}</h4>
+                  <div className="flex justify-between items-center text-[10px] text-textMuted pt-2 border-t border-borderMain/50">
+                    <span className="flex items-center gap-1"><MapPin size={10} /> {item.found_location}</span>
+                    <span>{item.found_date}</span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* 3. RECENT FOUND ITEMS SECTION */}
+      <section className="py-20 px-4 bg-bgMain border-b border-borderMain/50">
+        <div className="max-w-6xl mx-auto">
+          <div className="text-center max-w-2xl mx-auto mb-12">
+            <span className="text-xs uppercase tracking-widest font-extrabold text-emerald-500 bg-emerald-50 px-3.5 py-1.5 rounded-full border border-emerald-100">
+              Recovered & Logged
+            </span>
+            <h2 className="text-3xl font-sans font-bold text-textMain tracking-tight mt-4">
+              Recently Found Items in Safety Office
+            </h2>
+            <p className="text-sm text-textMuted mt-2">
+              Turned in belongings logged by safety officers currently waiting for their owners in the office.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+            {foundList.map((item) => (
+              <div
+                key={item.id}
+                onClick={() => {
+                  if (!currentUser) {
+                    setShowLoginModal(true);
+                  } else {
+                    setPage('dashboard');
+                    window.scrollTo(0, 0);
+                  }
+                }}
+                className="bg-white border border-borderMain/60 rounded-2xl overflow-hidden shadow-soft hover:shadow-hover hover:-translate-y-1 transition-all cursor-pointer flex flex-col justify-between"
+              >
+                <div className="relative h-44 bg-borderMain/10">
+                  <img src={item.images[0]} alt={item.item_name} className="w-full h-full object-cover" />
+                  <span className="absolute top-3 right-3 text-[10px] font-extrabold px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-100">
+                    FOUND
+                  </span>
+                </div>
+                <div className="p-4 space-y-2 text-left">
+                  <span className="text-[9px] font-sans font-bold text-accent uppercase tracking-wider">{item.category}</span>
+                  <h4 className="font-sans font-bold text-sm text-textMain truncate leading-tight">{item.item_name}</h4>
+                  <div className="flex justify-between items-center text-[10px] text-textMuted pt-2 border-t border-borderMain/50">
+                    <span className="flex items-center gap-1"><MapPin size={10} /> {item.found_location}</span>
+                    <span>{item.found_date}</span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* 4. STATISTICS SECTION */}
+      <section className="py-20 px-4 bg-white">
+        <div className="max-w-6xl mx-auto">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
+            {stats.map((stat) => {
+              const Icon = stat.icon;
+              return (
+                <div key={stat.label} className="text-center flex flex-col items-center">
+                  <div className={`w-10 h-10 rounded-full bg-borderMain/30 flex items-center justify-center ${stat.color} mb-3.5`}>
+                    <Icon size={20} />
+                  </div>
+                  <div className="text-4xl md:text-5xl font-sans font-extrabold text-textMain tracking-tight">
+                    <CountUp end={stat.val} suffix={stat.suffix} />
+                  </div>
+                  <p className="text-xs text-textMuted font-semibold uppercase tracking-wider mt-2.5">
+                    {stat.label}
+                  </p>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </section>
+
+      {/* 5. HOW IT WORKS SECTION */}
       <HowItWorks />
 
-      {/* 3. FEATURES SECTION */}
+      {/* 6. FEATURES SECTION */}
       <section className="py-24 px-4 bg-bgMain border-b border-borderMain/50">
         <div className="max-w-6xl mx-auto">
           <div className="text-center max-w-2xl mx-auto mb-16">
@@ -241,31 +464,7 @@ export const LandingPage: React.FC = () => {
         </div>
       </section>
 
-      {/* 4. STATISTICS SECTION */}
-      <section className="py-20 px-4 bg-white">
-        <div className="max-w-6xl mx-auto">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
-            {stats.map((stat) => {
-              const Icon = stat.icon;
-              return (
-                <div key={stat.label} className="text-center flex flex-col items-center">
-                  <div className={`w-10 h-10 rounded-full bg-borderMain/30 flex items-center justify-center ${stat.color} mb-3.5`}>
-                    <Icon size={20} />
-                  </div>
-                  <div className="text-4xl md:text-5xl font-sans font-extrabold text-textMain tracking-tight">
-                    <CountUp end={stat.val} suffix={stat.suffix} />
-                  </div>
-                  <p className="text-xs text-textMuted font-semibold uppercase tracking-wider mt-2.5">
-                    {stat.label}
-                  </p>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </section>
-
-      {/* 5. TESTIMONIALS SECTION */}
+      {/* 7. TESTIMONIALS SECTION */}
       <section className="py-24 px-4 bg-bgMain border-t border-borderMain/50">
         <div className="max-w-6xl mx-auto">
           <div className="text-center max-w-2xl mx-auto mb-16">
@@ -307,7 +506,7 @@ export const LandingPage: React.FC = () => {
         </div>
       </section>
 
-      {/* 6. MINIMAL FOOTER */}
+      {/* 8. MINIMAL FOOTER */}
       <footer className="mt-auto py-12 px-4 border-t border-borderMain/50 bg-white">
         <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
           <div className="flex items-center gap-2">
