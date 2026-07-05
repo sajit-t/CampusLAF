@@ -204,8 +204,8 @@ export const Navbar: React.FC = () => {
             onClick={() => setPage('landing')}
             className="flex items-center gap-2 cursor-pointer group"
           >
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-primary to-accent flex items-center justify-center shadow-md shadow-primary/10 transition-transform duration-300 group-hover:scale-105 group-hover:rotate-3">
-              <span className="text-white font-extrabold text-sm tracking-tight">CR</span>
+            <div className="w-9 h-9 transition-transform duration-300 group-hover:scale-105 group-hover:rotate-3 flex items-center justify-center overflow-hidden rounded-xl bg-white border border-borderMain/50">
+              <img src="/logo.png" alt="Logo" className="w-full h-full object-contain" />
             </div>
             <span className="font-sans font-bold text-lg tracking-tight text-textMain group-hover:text-primary transition-colors">
               Campus<span className="text-primary font-medium">Return</span>
