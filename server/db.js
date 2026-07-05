@@ -136,6 +136,17 @@ export const db = {
         .single();
       if (error) throw error;
       return data;
+    },
+
+    async update(id, profileData) {
+      const { data, error } = await supabase
+        .from('profiles')
+        .update(profileData)
+        .eq('id', id)
+        .select()
+        .single();
+      if (error) throw error;
+      return data;
     }
   },
 
