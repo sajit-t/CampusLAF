@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
-import { X, Camera, Loader2, AlertCircle } from 'lucide-react';
+import { X, Camera, Loader2, AlertCircle, Zap, ZapOff, ZoomIn } from 'lucide-react';
 
 interface BarcodeScannerProps {
   onScanSuccess: (rollNumber: string) => void;
@@ -15,47 +15,190 @@ interface CameraDevice {
 export const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onScanSuccess, onClose }) => {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [cameras, setCameras] = useState<CameraDevice[]>([]);
+  
+  // Camera Selection States
+  const [isMobile, setIsMobile] = useState(false);
+  const [mobileFacing, setMobileFacing] = useState<'environment' | 'user'>('environment');
   const [selectedCameraId, setSelectedCameraId] = useState<string>('');
+  
   const [isScanning, setIsScanning] = useState(false);
+  const [guidanceMessage, setGuidanceMessage] = useState('Searching for barcode...');
+  const [guidanceColor, setGuidanceColor] = useState<'gray' | 'orange' | 'green'>('gray');
+  const [scanSuccess, setScanSuccess] = useState(false);
+
+  // Video track constraints control states
+  const [videoTrack, setVideoTrack] = useState<MediaStreamTrack | null>(null);
+  const [hasTorch, setHasTorch] = useState(false);
+  const [isTorchOn, setIsTorchOn] = useState(false);
+  const [hasZoom, setHasZoom] = useState(false);
+  const [zoomMin, setZoomMin] = useState(1);
+  const [zoomMax, setZoomMax] = useState(1);
+  const [zoomVal, setZoomVal] = useState(1);
+
+  // Focus Ring Indicator states
+  const [focusRing, setFocusRing] = useState<{ x: number; y: number; visible: boolean }>({ x: 0, y: 0, visible: false });
+
+  // Pinch-to-zoom tracking ref
+  const touchStartDistRef = useRef<number | null>(null);
+
   const qrRef = useRef<Html5Qrcode | null>(null);
 
+  // Guidance rotator loop
   useEffect(() => {
-    // Get available cameras
-    Html5Qrcode.getCameras()
-      .then(devices => {
-        if (devices && devices.length > 0) {
-          const list = devices.map(d => ({ id: d.id, label: d.label || `Camera ${d.id}` }));
-          setCameras(list);
-          setSelectedCameraId(devices[0].id);
-        } else {
-          setErrorMsg('No camera devices found.');
-        }
-      })
-      .catch(err => {
-        console.error('Get cameras error:', err);
-        setErrorMsg('Camera permission denied or camera unavailable.');
-      });
+    if (!isScanning || scanSuccess) return;
+    
+    const messages = [
+      'Place the barcode completely inside this frame.',
+      'Keep it horizontal and hold steady.',
+      'Move closer if not detected.',
+      'Ensure good lighting on the card.'
+    ];
+    let index = 0;
+    
+    const timer = setInterval(() => {
+      index = (index + 1) % messages.length;
+      setGuidanceMessage(messages[index]);
+      setGuidanceColor(index === 2 ? 'orange' : 'gray');
+    }, 3500);
+
+    return () => clearInterval(timer);
+  }, [isScanning, scanSuccess]);
+
+  // Boot & detect device configuration
+  useEffect(() => {
+    const mobileCheck = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
+    setIsMobile(mobileCheck);
+
+    if (mobileCheck) {
+      // For mobile devices, bypass physical cameras listing and default to Back Camera (environment facingMode)
+      setIsScanning(true);
+      startScanningMobile('environment');
+    } else {
+      // For desktop, list actual physical cameras
+      Html5Qrcode.getCameras()
+        .then(devices => {
+          if (devices && devices.length > 0) {
+            const list = devices.map(d => ({ id: d.id, label: d.label || `Camera ${d.id}` }));
+            setCameras(list);
+            setSelectedCameraId(devices[0].id);
+          } else {
+            setErrorMsg('No camera devices found.');
+          }
+        })
+        .catch(err => {
+          console.error('Get cameras error:', err);
+          setErrorMsg('Camera permission denied or camera unavailable.');
+        });
+    }
 
     return () => {
-      // Clean up scanner on unmount
+      stopCameraTrack();
       if (qrRef.current && qrRef.current.isScanning) {
         qrRef.current.stop().catch(console.error);
       }
     };
   }, []);
 
-  const startScanning = (cameraId: string) => {
-    if (!cameraId) return;
-    
-    // Stop any active scanning first
+  const stopCameraTrack = () => {
+    if (videoTrack) {
+      // Release torch state
+      if (isTorchOn) {
+        videoTrack.applyConstraints({ advanced: [{ torch: false } as any] }).catch(() => {});
+      }
+      setVideoTrack(null);
+      setHasTorch(false);
+      setIsTorchOn(false);
+      setHasZoom(false);
+    }
+  };
+
+  const bindTrackCapabilities = (track: MediaStreamTrack) => {
+    try {
+      setVideoTrack(track);
+      
+      // Attempt manual autofocus or continuous autofocus
+      track.applyConstraints({
+        advanced: [
+          { focusMode: 'continuous' } as any
+        ]
+      }).catch(() => {});
+
+      const capabilities = track.getCapabilities() as any;
+      if (capabilities) {
+        if (capabilities.zoom) {
+          setHasZoom(true);
+          setZoomMin(capabilities.zoom.min || 1);
+          setZoomMax(capabilities.zoom.max || 1);
+          setZoomVal(track.getSettings().zoom || capabilities.zoom.min || 1);
+        } else {
+          setHasZoom(false);
+        }
+        setHasTorch(!!capabilities.torch);
+      }
+    } catch (e) {
+      console.warn('Error reading video track capacities:', e);
+    }
+  };
+
+  const startScanningMobile = (facing: 'environment' | 'user') => {
+    setErrorMsg(null);
+    setIsScanning(true);
+    stopCameraTrack();
+
     const stopPromise = qrRef.current && qrRef.current.isScanning
       ? qrRef.current.stop()
       : Promise.resolve();
 
     stopPromise.then(() => {
-      setErrorMsg(null);
-      setIsScanning(true);
-      
+      const scanner = new Html5Qrcode("scanner-reader", {
+        formatsToSupport: [Html5QrcodeSupportedFormats.CODE_39],
+        verbose: false
+      });
+      qrRef.current = scanner;
+
+      scanner.start(
+        { facingMode: facing },
+        {
+          fps: 20,
+          qrbox: (width, height) => {
+            // Rectangular scan box focused strictly on 1D barcodes
+            const boxWidth = Math.min(width * 0.9, 320);
+            const boxHeight = Math.min(height * 0.35, 100);
+            return { width: boxWidth, height: boxHeight };
+          }
+        },
+        (decodedText) => {
+          handleSuccessScan(decodedText);
+        },
+        () => {
+          // Ignore verbose scanner framing errors
+        }
+      ).then(() => {
+        // Query video tracks of the stream
+        const videoElement = document.querySelector("#scanner-reader video") as HTMLVideoElement;
+        if (videoElement && videoElement.srcObject instanceof MediaStream) {
+          const activeTrack = videoElement.srcObject.getVideoTracks()[0];
+          bindTrackCapabilities(activeTrack);
+        }
+      }).catch(err => {
+        console.error('Start scanner error:', err);
+        setErrorMsg('Failed to start camera feed. Check permissions or switch camera facing.');
+        setIsScanning(false);
+      });
+    });
+  };
+
+  const startScanningDesktop = (cameraId: string) => {
+    if (!cameraId) return;
+    setErrorMsg(null);
+    setIsScanning(true);
+    stopCameraTrack();
+
+    const stopPromise = qrRef.current && qrRef.current.isScanning
+      ? qrRef.current.stop()
+      : Promise.resolve();
+
+    stopPromise.then(() => {
       const scanner = new Html5Qrcode("scanner-reader", {
         formatsToSupport: [Html5QrcodeSupportedFormats.CODE_39],
         verbose: false
@@ -65,99 +208,345 @@ export const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onScanSuccess, o
       scanner.start(
         cameraId,
         {
-          fps: 15,
+          fps: 20,
           qrbox: (width, height) => {
-            // Rectangular scanning window optimized for 1D barcodes
             const boxWidth = Math.min(width * 0.85, 300);
             const boxHeight = Math.min(height * 0.35, 100);
             return { width: boxWidth, height: boxHeight };
           }
         },
         (decodedText) => {
-          // Success
-          scanner.stop().then(() => {
-            setIsScanning(false);
-            onScanSuccess(decodedText.trim());
-          }).catch(console.error);
+          handleSuccessScan(decodedText);
         },
         () => {
           // Ignore verbose scanner framing errors
         }
-      ).catch(err => {
+      ).then(() => {
+        const videoElement = document.querySelector("#scanner-reader video") as HTMLVideoElement;
+        if (videoElement && videoElement.srcObject instanceof MediaStream) {
+          const activeTrack = videoElement.srcObject.getVideoTracks()[0];
+          bindTrackCapabilities(activeTrack);
+        }
+      }).catch(err => {
         console.error('Start scanner error:', err);
-        setErrorMsg('Failed to start camera feed. Please try again or switch camera.');
+        setErrorMsg('Failed to start camera. Camera may be occupied by another app.');
         setIsScanning(false);
       });
     });
   };
 
+  const handleSuccessScan = (decodedText: string) => {
+    // 1. Instantly trigger visual success state
+    setScanSuccess(true);
+    setGuidanceMessage('Student ID Found.');
+    setGuidanceColor('green');
+
+    // 2. Play vibration if supported
+    if (navigator.vibrate) {
+      navigator.vibrate(120);
+    }
+
+    // 3. Pause scanning and return
+    if (qrRef.current && qrRef.current.isScanning) {
+      qrRef.current.stop().then(() => {
+        setIsScanning(false);
+        setTimeout(() => {
+          onScanSuccess(decodedText.trim());
+        }, 600); // Small delay for user to register the green flash feedback
+      }).catch(() => {
+        onScanSuccess(decodedText.trim());
+      });
+    } else {
+      onScanSuccess(decodedText.trim());
+    }
+  };
+
   useEffect(() => {
-    if (selectedCameraId) {
-      startScanning(selectedCameraId);
+    if (!isMobile && selectedCameraId) {
+      startScanningDesktop(selectedCameraId);
     }
   }, [selectedCameraId]);
 
+  // Torch control trigger
+  const handleToggleTorch = () => {
+    if (!videoTrack || !hasTorch) return;
+    const nextState = !isTorchOn;
+    videoTrack.applyConstraints({
+      advanced: [{ torch: nextState } as any]
+    }).then(() => {
+      setIsTorchOn(nextState);
+    }).catch(err => {
+      console.error('Error toggling torch:', err);
+    });
+  };
+
+  // Zoom control trigger
+  const handleZoomChange = (val: number) => {
+    if (!videoTrack || !hasZoom) return;
+    videoTrack.applyConstraints({
+      advanced: [{ zoom: val } as any]
+    }).then(() => {
+      setZoomVal(val);
+    }).catch(err => {
+      console.error('Error updating zoom:', err);
+    });
+  };
+
+  // Pinch to zoom handler
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (e.touches.length === 2) {
+      const dist = Math.hypot(
+        e.touches[0].clientX - e.touches[1].clientX,
+        e.touches[0].clientY - e.touches[1].clientY
+      );
+      touchStartDistRef.current = dist;
+    }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (e.touches.length === 2 && touchStartDistRef.current && hasZoom && videoTrack) {
+      const dist = Math.hypot(
+        e.touches[0].clientX - e.touches[1].clientX,
+        e.touches[0].clientY - e.touches[1].clientY
+      );
+      const delta = dist - touchStartDistRef.current;
+      touchStartDistRef.current = dist;
+
+      // Map touch delta to zoom scale adjustment
+      const step = (zoomMax - zoomMin) / 150;
+      const newVal = Math.min(zoomMax, Math.max(zoomMin, zoomVal + delta * step));
+      handleZoomChange(newVal);
+    }
+  };
+
+  const handleTouchEnd = () => {
+    touchStartDistRef.current = null;
+  };
+
+  // Tap to focus trigger with indicator ring
+  const handlePreviewTap = (e: React.MouseEvent<HTMLDivElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+
+    setFocusRing({ x, y, visible: true });
+    
+    // Trigger browser manual focus if supported
+    if (videoTrack) {
+      videoTrack.applyConstraints({
+        advanced: [
+          { focusMode: 'manual', pointsOfInterest: [{ x: x / rect.width, y: y / rect.height }] } as any
+        ]
+      }).catch(() => {
+        // Fallback to continuous focus re-trigger
+        videoTrack.applyConstraints({
+          advanced: [{ focusMode: 'continuous' } as any]
+        }).catch(() => {});
+      });
+    }
+
+    setTimeout(() => {
+      setFocusRing(prev => ({ ...prev, visible: false }));
+    }, 800);
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-      <div className="relative w-full max-w-md bg-white border border-borderMain rounded-3xl p-6 shadow-2xl space-y-4 text-left flex flex-col">
-        <button
-          onClick={onClose}
-          type="button"
-          className="absolute top-4 right-4 p-2 border border-borderMain/50 hover:bg-bgMain text-textMuted hover:text-textMain rounded-xl transition-all"
-        >
-          <X size={16} />
-        </button>
-
-        <div className="space-y-1">
-          <h4 className="font-sans font-extrabold text-sm text-textMain uppercase tracking-wider flex items-center gap-1.5">
-            <Camera size={14} className="text-primary animate-pulse" />
-            <span>ID Barcode Scanner (Code 39)</span>
-          </h4>
-          <p className="text-[10px] text-textMuted">
-            Hold the student ID card barcode in front of the camera inside the green bracket.
-          </p>
+      <div className="relative w-full max-w-lg bg-neutral-900 border border-neutral-800 rounded-3xl p-6 shadow- premium text-left flex flex-col space-y-5 overflow-hidden">
+        
+        {/* Header and Close button */}
+        <div className="flex justify-between items-start z-10">
+          <div className="space-y-1">
+            <h4 className="font-sans font-extrabold text-sm text-white uppercase tracking-wider flex items-center gap-1.5">
+              <Camera size={14} className="text-primary animate-pulse" />
+              <span>ID Barcode Scanner</span>
+            </h4>
+            <p className="text-[10px] text-neutral-400 font-medium">
+              Line up the student ID card barcode within the viewfinder brackets.
+            </p>
+          </div>
+          <button
+            onClick={onClose}
+            type="button"
+            className="p-2 bg-neutral-800/80 hover:bg-neutral-700 text-neutral-400 hover:text-white rounded-xl transition-all"
+          >
+            <X size={16} />
+          </button>
         </div>
 
-        {/* CAMERAS LIST SELECTION */}
-        {cameras.length > 1 && (
-          <div className="flex gap-2 items-center text-xs">
-            <span className="text-textMuted shrink-0 font-medium">Select Source:</span>
-            <select
-              value={selectedCameraId}
-              onChange={(e) => setSelectedCameraId(e.target.value)}
-              className="flex-1 px-3 py-1.5 bg-bgMain border border-borderMain rounded-lg focus:outline-none"
-            >
-              {cameras.map(c => (
-                <option key={c.id} value={c.id}>{c.label}</option>
-              ))}
-            </select>
-          </div>
-        )}
-
-        {/* SCANNING WINDOW */}
-        <div className="relative aspect-video w-full bg-neutral-900 rounded-2xl overflow-hidden border border-borderMain/60 flex items-center justify-center">
-          <div id="scanner-reader" className="w-full h-full" />
-          
-          {/* Overlay laser and target bounds */}
-          {isScanning && (
-            <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
-              <div className="w-[80%] h-[30%] border-2 border-emerald-500 rounded-lg relative flex items-center justify-center shadow-[0_0_15px_rgba(16,185,129,0.3)]">
-                {/* Simulated Red Laser Line */}
-                <div className="absolute w-[95%] h-[2px] bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.8)] animate-pulse" />
+        {/* CAMERAS SELECT DROPDOWN */}
+        <div className="flex flex-col gap-2.5 z-10 text-xs">
+          {isMobile ? (
+            <div className="flex items-center gap-3">
+              <span className="text-neutral-400 font-semibold shrink-0">Facing:</span>
+              <div className="grid grid-cols-2 gap-2 flex-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMobileFacing('environment');
+                    startScanningMobile('environment');
+                  }}
+                  className={`py-2 px-3 rounded-lg font-bold border transition-all text-center ${
+                    mobileFacing === 'environment'
+                      ? 'bg-primary border-primary text-white'
+                      : 'bg-neutral-800 border-neutral-700 text-neutral-400 hover:text-white'
+                  }`}
+                >
+                  Back Camera
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMobileFacing('user');
+                    startScanningMobile('user');
+                  }}
+                  className={`py-2 px-3 rounded-lg font-bold border transition-all text-center ${
+                    mobileFacing === 'user'
+                      ? 'bg-primary border-primary text-white'
+                      : 'bg-neutral-800 border-neutral-700 text-neutral-400 hover:text-white'
+                  }`}
+                >
+                  Front Camera
+                </button>
               </div>
+            </div>
+          ) : (
+            cameras.length > 1 && (
+              <div className="flex gap-3 items-center">
+                <span className="text-neutral-400 font-semibold shrink-0">Source Camera:</span>
+                <select
+                  value={selectedCameraId}
+                  onChange={(e) => setSelectedCameraId(e.target.value)}
+                  className="flex-1 px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-white font-medium focus:outline-none focus:ring-1 focus:ring-primary"
+                >
+                  {cameras.map(c => (
+                    <option key={c.id} value={c.id}>{c.label}</option>
+                  ))}
+                </select>
+              </div>
+            )
+          )}
+        </div>
+
+        {/* SCANNING PREVIEW VIEWPORT WITH SCROLL OVERLAYS */}
+        <div 
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
+          onClick={handlePreviewTap}
+          className="relative aspect-video w-full bg-black rounded-2xl overflow-hidden border border-neutral-800 flex items-center justify-center cursor-pointer select-none"
+        >
+          {/* Main camera stream frame hook */}
+          <div id="scanner-reader" className="w-full h-full object-cover" />
+
+          {/* TAP TO FOCUS INDICATOR RING */}
+          {focusRing.visible && (
+            <div 
+              style={{ left: focusRing.x - 20, top: focusRing.y - 20 }}
+              className="absolute w-10 h-10 border-2 border-dashed border-yellow-400 rounded-full animate-ping pointer-events-none z-30"
+            />
+          )}
+
+          {/* DARK TRANSLUCENT MASK LAYER - Creates highlight box in center */}
+          {isScanning && (
+            <div className="absolute inset-0 flex flex-col pointer-events-none z-20">
+              {/* Top Dark Over */}
+              <div className="flex-1 bg-black/60 w-full" />
+              {/* Center Row viewport slot */}
+              <div className="h-[35%] w-full flex">
+                <div className="flex-1 bg-black/60" />
+                {/* Viewport Outline brackets box */}
+                <div className={`w-[85%] max-w-[320px] h-full border-2 rounded-xl relative flex items-center justify-center transition-colors duration-300 ${
+                  scanSuccess 
+                    ? 'border-emerald-500 shadow-[0_0_20px_rgba(16,185,129,0.5)] bg-emerald-500/10' 
+                    : 'border-white/80 shadow-[0_0_15px_rgba(255,255,255,0.1)]'
+                }`}>
+                  {/* Laser alignment line */}
+                  <div className={`absolute w-[95%] h-[2px] shadow-sm transition-all duration-300 ${
+                    scanSuccess 
+                      ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)] animate-none' 
+                      : 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.8)] animate-pulse'
+                  }`} />
+                </div>
+                <div className="flex-1 bg-black/60" />
+              </div>
+              {/* Bottom Dark Over */}
+              <div className="flex-1 bg-black/60 w-full" />
             </div>
           )}
 
+          {/* Loading video placeholder */}
           {!isScanning && !errorMsg && (
-            <span className="text-xs text-white/50 flex items-center gap-1.5">
-              <Loader2 className="animate-spin text-white" size={14} /> Starting video...
-            </span>
+            <div className="absolute inset-0 bg-neutral-900/90 flex flex-col items-center justify-center gap-2 text-white/50 z-20">
+              <Loader2 className="animate-spin text-primary" size={24} />
+              <span className="text-[10px] font-semibold tracking-wider uppercase">Accessing Camera...</span>
+            </div>
           )}
         </div>
 
-        {/* ERROR MESSAGE */}
+        {/* GUIDANCE MESSAGE & STATUS */}
+        {isScanning && (
+          <div className="bg-neutral-800/40 border border-neutral-800/80 p-3.5 rounded-2xl text-center space-y-2 z-10">
+            <p className="text-[11px] text-white font-semibold leading-relaxed">
+              Place the barcode completely inside this frame. Keep it horizontal.
+            </p>
+            
+            <div className="flex items-center justify-center gap-2">
+              <span className={`w-2 h-2 rounded-full ${
+                guidanceColor === 'green' ? 'bg-emerald-500 animate-ping' :
+                guidanceColor === 'orange' ? 'bg-amber-500' : 'bg-neutral-500'
+              }`} />
+              <span className={`text-[10px] font-bold uppercase tracking-wider ${
+                guidanceColor === 'green' ? 'text-emerald-400' :
+                guidanceColor === 'orange' ? 'text-amber-400' : 'text-neutral-400'
+              }`}>
+                {guidanceMessage}
+              </span>
+            </div>
+          </div>
+        )}
+
+        {/* MANUAL ZOOM & FLASH/TORCH MOBILE CONTROLS */}
+        {isScanning && (hasZoom || hasTorch) && (
+          <div className="bg-neutral-800/60 p-3.5 rounded-2xl flex items-center justify-between gap-4 z-10">
+            {/* Zoom Slider */}
+            {hasZoom && (
+              <div className="flex items-center gap-2.5 flex-1">
+                <ZoomIn size={14} className="text-neutral-400 shrink-0" />
+                <input
+                  type="range"
+                  min={zoomMin}
+                  max={zoomMax}
+                  step={0.1}
+                  value={zoomVal}
+                  onChange={(e) => handleZoomChange(parseFloat(e.target.value))}
+                  className="w-full h-1.5 bg-neutral-700 rounded-lg appearance-none cursor-pointer accent-primary"
+                />
+                <span className="text-[9px] font-mono text-neutral-400 font-bold shrink-0">{zoomVal.toFixed(1)}x</span>
+              </div>
+            )}
+
+            {/* Flash/Torch Switch */}
+            {hasTorch && (
+              <button
+                type="button"
+                onClick={handleToggleTorch}
+                className={`p-2.5 rounded-xl border transition-all flex items-center justify-center gap-1.5 font-bold text-[10px] ${
+                  isTorchOn
+                    ? 'bg-amber-400/10 border-amber-400 text-amber-400'
+                    : 'bg-neutral-800 border-neutral-700 text-neutral-400 hover:text-white'
+                }`}
+              >
+                {isTorchOn ? <ZapOff size={13} /> : <Zap size={13} />}
+                <span>Flash</span>
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* COMPREHENSIVE ERROR FEEDBACK */}
         {errorMsg && (
-          <div className="p-3 bg-red-50 border border-red-100 rounded-xl text-[10px] text-red-700 font-bold flex items-center gap-1.5">
+          <div className="p-3.5 bg-red-500/10 border border-red-500/20 rounded-2xl text-[10px] text-red-400 font-bold flex items-center gap-2 z-10 animate-fadeIn">
             <AlertCircle size={14} className="text-red-500 shrink-0" />
             <span>{errorMsg}</span>
           </div>
