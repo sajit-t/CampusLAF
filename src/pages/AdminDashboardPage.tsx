@@ -109,6 +109,7 @@ export const AdminDashboardPage: React.FC = () => {
   const [itemNotes, setItemNotes] = useState('');
   const [itemSuccessMsg, setItemSuccessMsg] = useState('');
   const [receiveFiles, setReceiveFiles] = useState<File[]>([]);
+  const [itemSubmitting, setItemSubmitting] = useState(false);
 
   const [showBarcodeModal, setShowBarcodeModal] = useState(false);
   const [scannerContext, setScannerContext] = useState<'register' | 'claim_verify' | null>(null);
@@ -224,47 +225,57 @@ export const AdminDashboardPage: React.FC = () => {
   // Receive item submit
   const handleRegisterItemSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (itemSubmitting) return;
     if (!itemName || !itemDesc || !itemLoc) {
       alert('Please fill item name, description and location.');
       return;
     }
+    setItemSubmitting(true);
+    try {
+      const payload = {
+        found_by_roll_number: foundStudent ? foundStudent.roll_number : undefined,
+        category: itemCategory,
+        item_name: itemName,
+        brand: itemBrand,
+        color: itemColor,
+        description: itemDesc,
+        estimated_value: parseFloat(itemVal) || 0,
+        found_location: itemLoc,
+        building: itemBldg,
+        floor: parseInt(itemFloor) || undefined,
+        room: itemRoom,
+        found_date: itemDate,
+        found_time: itemTime,
+        notes: itemNotes
+      };
 
-    const payload = {
-      found_by_roll_number: foundStudent ? foundStudent.roll_number : undefined,
-      category: itemCategory,
-      item_name: itemName,
-      brand: itemBrand,
-      color: itemColor,
-      description: itemDesc,
-      estimated_value: parseFloat(itemVal) || 0,
-      found_location: itemLoc,
-      building: itemBldg,
-      floor: parseInt(itemFloor) || undefined,
-      room: itemRoom,
-      found_date: itemDate,
-      found_time: itemTime,
-      notes: itemNotes
-    };
-
-    const success = await registerItem(payload, receiveFiles);
-    if (success) {
-      setItemSuccessMsg('Item logged successfully and published to student dashboards!');
-      // Reset fields
-      setReceiveRoll('');
-      setFoundStudent(null);
-      setItemName('');
-      setItemBrand('');
-      setItemColor('');
-      setItemDesc('');
-      setItemVal('');
-      setItemLoc('');
-      setItemBldg('');
-      setItemRoom('');
-      setItemNotes('');
-      setSelectedLocOption('');
-      setCustomLoc('');
-      setReceiveFiles([]);
-      setTimeout(() => setItemSuccessMsg(''), 4000);
+      const success = await registerItem(payload, receiveFiles);
+      if (success) {
+        setItemSuccessMsg('Item logged successfully and published to student dashboards!');
+        // Reset fields
+        setReceiveRoll('');
+        setFoundStudent(null);
+        setItemName('');
+        setItemBrand('');
+        setItemColor('');
+        setItemDesc('');
+        setItemVal('');
+        setItemLoc('');
+        setItemBldg('');
+        setItemRoom('');
+        setItemNotes('');
+        setSelectedLocOption('');
+        setCustomLoc('');
+        setReceiveFiles([]);
+        setTimeout(() => setItemSuccessMsg(''), 4000);
+      } else {
+        alert('Failed to register item. Please try again.');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Error registering item.');
+    } finally {
+      setItemSubmitting(false);
     }
   };
 
@@ -951,9 +962,10 @@ export const AdminDashboardPage: React.FC = () => {
                 <div className="flex justify-end gap-3 pt-2">
                   <button
                     type="submit"
-                    className="px-6 py-3 bg-primary hover:bg-primary-hover text-white text-xs font-bold rounded-xl transition-all shadow-md"
+                    disabled={itemSubmitting}
+                    className="px-6 py-3 bg-primary hover:bg-primary-hover text-white text-xs font-bold rounded-xl transition-all shadow-md disabled:opacity-50"
                   >
-                    Save & Publish Item
+                    {itemSubmitting ? 'Saving & Publishing...' : 'Save & Publish Item'}
                   </button>
                 </div>
               </form>

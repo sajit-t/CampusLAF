@@ -112,6 +112,7 @@ export const DashboardPage: React.FC = () => {
 
   const handleStudentReportSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (repSubmitting) return;
     if (!repName || !repDesc || !repLocation) {
       alert('Please fill out all required fields.');
       return;
