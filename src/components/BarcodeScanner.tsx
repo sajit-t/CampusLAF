@@ -22,8 +22,7 @@ export const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onScanSuccess, o
   const [selectedCameraId, setSelectedCameraId] = useState<string>('');
   
   const [isScanning, setIsScanning] = useState(false);
-  const [guidanceMessage, setGuidanceMessage] = useState('Searching for barcode...');
-  const [guidanceColor, setGuidanceColor] = useState<'gray' | 'orange' | 'green'>('gray');
+  const [guidanceMessage, setGuidanceMessage] = useState('Searching for ID card...');
   const [scanSuccess, setScanSuccess] = useState(false);
 
   // Video track constraints control states
@@ -42,27 +41,6 @@ export const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onScanSuccess, o
   const touchStartDistRef = useRef<number | null>(null);
 
   const qrRef = useRef<Html5Qrcode | null>(null);
-
-  // Guidance rotator loop
-  useEffect(() => {
-    if (!isScanning || scanSuccess) return;
-    
-    const messages = [
-      'Place the barcode completely inside this frame.',
-      'Keep it horizontal and hold steady.',
-      'Move closer if not detected.',
-      'Ensure good lighting on the card.'
-    ];
-    let index = 0;
-    
-    const timer = setInterval(() => {
-      index = (index + 1) % messages.length;
-      setGuidanceMessage(messages[index]);
-      setGuidanceColor(index === 2 ? 'orange' : 'gray');
-    }, 3500);
-
-    return () => clearInterval(timer);
-  }, [isScanning, scanSuccess]);
 
   // Boot & detect device configuration
   useEffect(() => {
@@ -161,9 +139,9 @@ export const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onScanSuccess, o
         {
           fps: 20,
           qrbox: (width, height) => {
-            // Rectangular scan box focused strictly on 1D barcodes
-            const boxWidth = Math.min(width * 0.9, 320);
-            const boxHeight = Math.min(height * 0.35, 100);
+            // Decodes region corresponding to the ID card bounds
+            const boxWidth = Math.min(width * 0.85, 340);
+            const boxHeight = Math.min(boxWidth / 1.58, height * 0.75);
             return { width: boxWidth, height: boxHeight };
           }
         },
@@ -174,6 +152,8 @@ export const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onScanSuccess, o
           // Ignore verbose scanner framing errors
         }
       ).then(() => {
+        setGuidanceMessage('✓ Card Detected');
+        
         // Query video tracks of the stream
         const videoElement = document.querySelector("#scanner-reader video") as HTMLVideoElement;
         if (videoElement && videoElement.srcObject instanceof MediaStream) {
@@ -210,8 +190,8 @@ export const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onScanSuccess, o
         {
           fps: 20,
           qrbox: (width, height) => {
-            const boxWidth = Math.min(width * 0.85, 300);
-            const boxHeight = Math.min(height * 0.35, 100);
+            const boxWidth = Math.min(width * 0.85, 340);
+            const boxHeight = Math.min(boxWidth / 1.58, height * 0.75);
             return { width: boxWidth, height: boxHeight };
           }
         },
@@ -222,6 +202,8 @@ export const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onScanSuccess, o
           // Ignore verbose scanner framing errors
         }
       ).then(() => {
+        setGuidanceMessage('✓ Card Detected');
+
         const videoElement = document.querySelector("#scanner-reader video") as HTMLVideoElement;
         if (videoElement && videoElement.srcObject instanceof MediaStream) {
           const activeTrack = videoElement.srcObject.getVideoTracks()[0];
@@ -238,8 +220,7 @@ export const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onScanSuccess, o
   const handleSuccessScan = (decodedText: string) => {
     // 1. Instantly trigger visual success state
     setScanSuccess(true);
-    setGuidanceMessage('Student ID Found.');
-    setGuidanceColor('green');
+    setGuidanceMessage('✓ Barcode Recognized');
 
     // 2. Play vibration if supported
     if (navigator.vibrate) {
@@ -362,7 +343,7 @@ export const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onScanSuccess, o
               <span>ID Barcode Scanner</span>
             </h4>
             <p className="text-[10px] text-neutral-400 font-medium">
-              Line up the student ID card barcode within the viewfinder brackets.
+              Position the entire Student ID card inside the scanner frame.
             </p>
           </div>
           <button
@@ -447,30 +428,43 @@ export const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onScanSuccess, o
             />
           )}
 
-          {/* DARK TRANSLUCENT MASK LAYER - Creates highlight box in center */}
+          {/* HOLE-PUNCH DOCUMENT SCANNER MASK LAYER */}
           {isScanning && (
             <div className="absolute inset-0 flex flex-col pointer-events-none z-20">
-              {/* Top Dark Over */}
+              {/* Top Dark Block */}
               <div className="flex-1 bg-black/60 w-full" />
-              {/* Center Row viewport slot */}
-              <div className="h-[35%] w-full flex">
+              
+              {/* Center Row Viewport Block - dynamically calculated based on aspect ratio */}
+              <div className="flex w-full items-stretch shrink-0">
                 <div className="flex-1 bg-black/60" />
-                {/* Viewport Outline brackets box */}
-                <div className={`w-[85%] max-w-[320px] h-full border-2 rounded-xl relative flex items-center justify-center transition-colors duration-300 ${
+                
+                {/* Viewport Card Frame (aspect-ratio 1.58:1) */}
+                <div className={`aspect-[1.58] w-[82%] max-w-[320px] border-2 rounded-2xl relative flex flex-col items-center justify-center text-center transition-all duration-300 shrink-0 ${
                   scanSuccess 
-                    ? 'border-emerald-500 shadow-[0_0_20px_rgba(16,185,129,0.5)] bg-emerald-500/10' 
-                    : 'border-white/80 shadow-[0_0_15px_rgba(255,255,255,0.1)]'
+                    ? 'border-emerald-500 shadow-[0_0_25px_rgba(16,185,129,0.5)] bg-emerald-500/10' 
+                    : 'border-white/70 shadow-[0_0_15px_rgba(255,255,255,0.15)] bg-transparent'
                 }`}>
-                  {/* Laser alignment line */}
-                  <div className={`absolute w-[95%] h-[2px] shadow-sm transition-all duration-300 ${
-                    scanSuccess 
-                      ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)] animate-none' 
-                      : 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.8)] animate-pulse'
-                  }`} />
+                  {/* Four Corner Guides */}
+                  <div className={`absolute -top-[2px] -left-[2px] w-6 h-6 border-t-4 border-l-4 rounded-tl-xl transition-colors duration-300 ${scanSuccess ? 'border-emerald-500' : 'border-primary'}`} />
+                  <div className={`absolute -top-[2px] -right-[2px] w-6 h-6 border-t-4 border-r-4 rounded-tr-xl transition-colors duration-300 ${scanSuccess ? 'border-emerald-500' : 'border-primary'}`} />
+                  <div className={`absolute -bottom-[2px] -left-[2px] w-6 h-6 border-b-4 border-l-4 rounded-bl-xl transition-colors duration-300 ${scanSuccess ? 'border-emerald-500' : 'border-primary'}`} />
+                  <div className={`absolute -bottom-[2px] -right-[2px] w-6 h-6 border-b-4 border-r-4 rounded-br-xl transition-colors duration-300 ${scanSuccess ? 'border-emerald-500' : 'border-primary'}`} />
+
+                  {/* Inner Viewport Text guides */}
+                  <div className="space-y-1.5 select-none bg-black/55 px-4 py-3 rounded-2xl border border-white/5 max-w-[260px] mx-auto shadow-md">
+                    <p className="text-[10px] font-sans font-extrabold text-white uppercase tracking-wider">
+                      Place your Student ID inside the frame
+                    </p>
+                    <p className="text-[9px] text-neutral-300 font-semibold leading-normal">
+                      The barcode will be detected automatically.
+                    </p>
+                  </div>
                 </div>
+                
                 <div className="flex-1 bg-black/60" />
               </div>
-              {/* Bottom Dark Over */}
+
+              {/* Bottom Dark Block */}
               <div className="flex-1 bg-black/60 w-full" />
             </div>
           )}
@@ -486,23 +480,13 @@ export const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onScanSuccess, o
 
         {/* GUIDANCE MESSAGE & STATUS */}
         {isScanning && (
-          <div className="bg-neutral-800/40 border border-neutral-800/80 p-3.5 rounded-2xl text-center space-y-2 z-10">
-            <p className="text-[11px] text-white font-semibold leading-relaxed">
-              Place the barcode completely inside this frame. Keep it horizontal.
-            </p>
-            
-            <div className="flex items-center justify-center gap-2">
-              <span className={`w-2 h-2 rounded-full ${
-                guidanceColor === 'green' ? 'bg-emerald-500 animate-ping' :
-                guidanceColor === 'orange' ? 'bg-amber-500' : 'bg-neutral-500'
-              }`} />
-              <span className={`text-[10px] font-bold uppercase tracking-wider ${
-                guidanceColor === 'green' ? 'text-emerald-400' :
-                guidanceColor === 'orange' ? 'text-amber-400' : 'text-neutral-400'
-              }`}>
-                {guidanceMessage}
-              </span>
-            </div>
+          <div className="bg-neutral-800/40 border border-neutral-800/80 p-3.5 rounded-2xl text-center flex items-center justify-center gap-2 z-10">
+            <span className={`w-2.5 h-2.5 rounded-full ${
+              guidanceMessage.includes('Recognized') ? 'bg-emerald-500 animate-pulse' : 'bg-emerald-500 animate-ping'
+            }`} />
+            <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-400">
+              {guidanceMessage}
+            </span>
           </div>
         )}
 
