@@ -62,13 +62,12 @@ router.get('/:id', authenticateToken, async (req, res) => {
 router.post('/', authenticateToken, async (req, res) => {
   const { item_id, roll_number, remarks } = req.body;
 
-  if (!item_id || !roll_number || !remarks) {
-    return res.status(400).json({ error: 'Item ID, Roll Number, and verification answers are required' });
+  if (req.user.role === 'student') {
+    return res.status(403).json({ error: 'Access denied: Online claims are disabled. Please visit the physical office to verify and collect items.' });
   }
 
-  // Security: Students can only claim on their own roll number
-  if (req.user.role === 'student' && req.user.roll_number !== roll_number) {
-    return res.status(403).json({ error: 'Unauthorized: Cannot submit claim for a different Roll Number' });
+  if (!item_id || !roll_number || !remarks) {
+    return res.status(400).json({ error: 'Item ID, Roll Number, and verification answers are required' });
   }
 
   try {
@@ -115,6 +114,69 @@ router.post('/', authenticateToken, async (req, res) => {
   } catch (error) {
     console.error('Submit claim error:', error);
     res.status(500).json({ error: 'Server error processing claim submission' });
+  }
+});
+
+// 3b. POST /api/claims/checkout - In-person Handover & Direct Checkout (Admins only)
+router.post('/checkout', authenticateToken, async (req, res) => {
+  const { item_id, roll_number, verification_notes } = req.body;
+
+  if (req.user.role === 'student') {
+    return res.status(403).json({ error: 'Access denied: Admin only' });
+  }
+
+  if (!item_id || !roll_number || !verification_notes) {
+    return res.status(400).json({ error: 'Item ID, Roll Number, and verification notes are required' });
+  }
+
+  try {
+    // Check item
+    const item = await db.items.findById(item_id);
+    if (!item) return res.status(404).json({ error: 'Item not found' });
+
+    if (item.status === 'Claimed & Collected') {
+      return res.status(400).json({ error: 'Item has already been collected' });
+    }
+
+    // Verify student exists
+    const student = await db.students.findByRoll(roll_number);
+    if (!student) return res.status(404).json({ error: 'Student Roll Number is invalid' });
+    if (!student.active_status) {
+      return res.status(403).json({ error: 'This student account has been disabled' });
+    }
+
+    const receiptCode = 'REC-' + Math.floor(100000 + Math.random() * 900000);
+
+    // Create approved and collected claim record directly
+    const newClaim = await db.claims.create({
+      item_id,
+      claimant_roll_number: roll_number,
+      approval_status: 'approved',
+      approved_by: req.user.id,
+      remarks: 'In-person verification and direct checkout.',
+      expected_collection_deadline: new Date().toISOString(),
+      claimed_date: new Date().toISOString(),
+      verification_notes,
+      receipt_code: receiptCode
+    });
+
+    // Update item status to 'Claimed & Collected'
+    await db.items.setStatus(item_id, 'Claimed & Collected');
+
+    // Create audit log
+    await db.logs.create({
+      performed_by: req.user.id,
+      action: 'DIRECT_CHECKOUT',
+      affected_record_table: 'claims',
+      affected_record_id: newClaim.id || 'new',
+      details: { roll_number, item_id, item_name: item.item_name, verification_notes }
+    });
+
+    res.status(201).json(newClaim);
+
+  } catch (error) {
+    console.error('Checkout item error:', error);
+    res.status(500).json({ error: 'Server error processing direct checkout' });
   }
 });
 

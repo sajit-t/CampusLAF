@@ -13,38 +13,7 @@ async function runLifecycleChecks() {
 
   try {
     // 1. Process Expired Claims (deadline exceeded for approved claims awaiting collection)
-    const activeClaims = await db.claims.getAll({ status: 'approved' });
-    let expiredCount = 0;
-
-    for (const claim of activeClaims) {
-      if (claim.claimed_date) continue; // Skip collected claims
-      const deadline = new Date(claim.expected_collection_deadline);
-      if (deadline < now) {
-        // Claim expired! Update claim status
-        await db.claims.update(claim.id, {
-          approval_status: 'expired',
-          remarks: `System: Claim expired automatically because student did not visit within 2 working days of approval (Deadline: ${deadline.toLocaleString()}).`
-        });
-
-        // Revert item status to 'Waiting for Owner'
-        await db.items.setStatus(claim.item_id, 'Waiting for Owner');
-
-        // Write audit log
-        await db.logs.create({
-          performed_by: null, // System Action
-          action: 'EXPIRE_CLAIM',
-          affected_record_table: 'claims',
-          affected_record_id: claim.id,
-          details: { item_id: claim.item_id, claimant: claim.claimant_roll_number }
-        });
-
-        expiredCount++;
-      }
-    }
-
-    if (expiredCount > 0) {
-      console.log(`[Worker] Expired ${expiredCount} claim requests`);
-    }
+    // (Disabled because online claims are replaced by direct in-person checkout)
 
     // 2. Process Auto-Archiving (claimed more than 7 days ago)
     const approvedClaims = await db.claims.getAll({ status: 'approved' });

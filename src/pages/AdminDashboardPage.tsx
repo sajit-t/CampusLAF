@@ -6,7 +6,7 @@ import { BarcodeScanner } from '../components/BarcodeScanner';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Sliders, Users, Plus, FileCheck, FileText, Download, Upload, Trash2, 
-  Edit, Search, Check, X, HelpCircle, Scan, PackageOpen, Shield, CheckSquare, CheckCircle, UserCheck
+  Edit, Search, Check, Scan, PackageOpen, Shield, CheckSquare, CheckCircle, UserCheck
 } from 'lucide-react';
 
 export const predefinedLocations = [
@@ -59,9 +59,7 @@ export const AdminDashboardPage: React.FC = () => {
     importStudents,
     fetchStudentByRoll,
     registerItem,
-    approveClaim,
-    rejectClaim,
-    collectClaim,
+    checkoutItem,
     adminActiveTab: activeView,
     setAdminActiveTab: setActiveView
   } = useApp();  // Student CRUD states
@@ -111,7 +109,6 @@ export const AdminDashboardPage: React.FC = () => {
   const [itemNotes, setItemNotes] = useState('');
   const [itemSuccessMsg, setItemSuccessMsg] = useState('');
 
-  const [claimsSubTab, setClaimsSubTab] = useState<'pending' | 'approved'>('pending');
   const [inventorySearch, setInventorySearch] = useState('');
   const [inventoryStatusFilter, setInventoryStatusFilter] = useState('All');
 
@@ -145,17 +142,69 @@ export const AdminDashboardPage: React.FC = () => {
   const [receiveFiles, setReceiveFiles] = useState<File[]>([]);
   const [itemSubmitting, setItemSubmitting] = useState(false);
 
+  // Checkout Modal states
+  const [showCheckoutModal, setShowCheckoutModal] = useState(false);
+  const [checkoutItemId, setCheckoutItemId] = useState<string>('');
+  const [checkoutRoll, setCheckoutRoll] = useState('');
+  const [checkoutNotes, setCheckoutNotes] = useState('');
+  const [checkoutError, setCheckoutError] = useState('');
+  const [checkoutSuccess, setCheckoutSuccess] = useState(false);
+  const [checkoutStudentLookupMsg, setCheckoutStudentLookupMsg] = useState('');
+  const [checkoutStudentInfo, setCheckoutStudentInfo] = useState<Student | null>(null);
+
+  const handleCheckoutStudentLookup = async (roll: string) => {
+    if (!roll.trim()) return;
+    setCheckoutStudentLookupMsg('Searching...');
+    setCheckoutStudentInfo(null);
+    try {
+      const student = await fetchStudentByRoll(roll.trim());
+      if (student) {
+        if (!student.active_status) {
+          setCheckoutStudentLookupMsg('This student account is disabled.');
+        } else {
+          setCheckoutStudentInfo(student);
+          setCheckoutStudentLookupMsg('');
+        }
+      } else {
+        setCheckoutStudentLookupMsg('No active student record found.');
+      }
+    } catch (err: any) {
+      setCheckoutStudentLookupMsg('Lookup failed: ' + err.message);
+    }
+  };
+
+  const handleDirectCheckoutSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!checkoutRoll.trim()) {
+      setCheckoutError('Student roll number is required.');
+      return;
+    }
+    if (!checkoutNotes.trim()) {
+      setCheckoutError('Please input verification notes (e.g. proof shown).');
+      return;
+    }
+
+    setCheckoutError('');
+    const success = await checkoutItem(checkoutItemId, checkoutRoll.trim(), checkoutNotes);
+    if (success) {
+      setCheckoutSuccess(true);
+      fetchClaims();
+      setTimeout(() => {
+        setShowCheckoutModal(false);
+        setCheckoutSuccess(false);
+        setCheckoutItemId('');
+        setCheckoutRoll('');
+        setCheckoutNotes('');
+        setCheckoutStudentInfo(null);
+        setCheckoutStudentLookupMsg('');
+      }, 2000);
+    } else {
+      setCheckoutError('Checkout failed. Please verify that the roll number exists.');
+    }
+  };
+
   const [showBarcodeModal, setShowBarcodeModal] = useState(false);
   const [scannerContext, setScannerContext] = useState<'register' | 'claim_verify' | null>(null);
-  const [activeClaimIdForScanner, setActiveClaimIdForScanner] = useState<string>('');
-  
-  // Verification states per claim ID
-  const [verifyRollInputs, setVerifyRollInputs] = useState<Record<string, string>>({});
-  const [verifiedStudents, setVerifiedStudents] = useState<Record<string, Student>>({});
-  const [verifyMessages, setVerifyMessages] = useState<Record<string, string>>({});
-
-  // Claims process notes
-  const [verificationNotes, setVerificationNotes] = useState<Record<string, string>>({});
 
   // Refresh students list on filters change
   useEffect(() => {
@@ -217,43 +266,10 @@ export const AdminDashboardPage: React.FC = () => {
         setLookupMessage('Student Roll Number not found.');
       }
     } else if (scannerContext === 'claim_verify') {
-      setVerifyRollInputs(prev => ({ ...prev, [activeClaimIdForScanner]: code }));
-      setVerifyMessages(prev => ({ ...prev, [activeClaimIdForScanner]: 'Searching student database...' }));
-      const student = await fetchStudentByRoll(code);
-      if (student) {
-        setVerifiedStudents(prev => ({ ...prev, [activeClaimIdForScanner]: student }));
-        setVerifyMessages(prev => ({ ...prev, [activeClaimIdForScanner]: '' }));
-      } else {
-        setVerifiedStudents(prev => {
-          const next = { ...prev };
-          delete next[activeClaimIdForScanner];
-          return next;
-        });
-        setVerifyMessages(prev => ({ ...prev, [activeClaimIdForScanner]: 'Student Roll Number not found.' }));
-      }
+      setCheckoutRoll(code);
+      handleCheckoutStudentLookup(code);
     }
     setScannerContext(null);
-  };
-
-  const handleVerifyLookup = async (claimId: string) => {
-    const roll = verifyRollInputs[claimId] || '';
-    if (!roll.trim()) {
-      setVerifyMessages(prev => ({ ...prev, [claimId]: 'Please enter a roll number.' }));
-      return;
-    }
-    setVerifyMessages(prev => ({ ...prev, [claimId]: 'Searching database...' }));
-    const student = await fetchStudentByRoll(roll.trim());
-    if (student) {
-      setVerifiedStudents(prev => ({ ...prev, [claimId]: student }));
-      setVerifyMessages(prev => ({ ...prev, [claimId]: '' }));
-    } else {
-      setVerifiedStudents(prev => {
-        const next = { ...prev };
-        delete next[claimId];
-        return next;
-      });
-      setVerifyMessages(prev => ({ ...prev, [claimId]: 'Student Roll Number not found.' }));
-    }
   };
 
   // Receive item submit
@@ -388,16 +404,12 @@ export const AdminDashboardPage: React.FC = () => {
     }
   };
 
-  const pendingClaims = claims.filter(c => c.approval_status === 'pending');
-  const approvedClaims = claims.filter(c => c.approval_status === 'approved' && !c.claimed_date);
-  const totalClaimsCount = pendingClaims.length + approvedClaims.length;
-
   const menuList = [
     { id: 'dashboard', label: 'Dashboard', icon: Sliders },
     { id: 'inventory', label: 'Office Inventory', icon: PackageOpen },
     { id: 'students', label: 'Student Database', icon: Users },
     { id: 'receive', label: 'Receive Found Item', icon: Plus },
-    { id: 'claims', label: 'Claims Queue', icon: FileCheck, badge: totalClaimsCount > 0 ? totalClaimsCount : undefined },
+    { id: 'claims', label: 'Handover History', icon: FileCheck },
     { id: 'reports', label: 'Analytics Reports', icon: FileText },
   ] as const;
 
@@ -419,7 +431,7 @@ export const AdminDashboardPage: React.FC = () => {
             </div>
             <div className="text-left overflow-hidden">
               <span className="text-[10px] font-sans font-extrabold uppercase tracking-wider px-2 py-0.5 rounded-full bg-primary-light text-primary leading-tight inline-block">
-                {currentUser?.role.replace('_', ' ')}
+                {currentUser?.role?.replace('_', ' ') || ''}
               </span>
               <p className="font-sans font-bold text-xs text-textMain truncate leading-tight mt-1">
                 {currentUser?.name}
@@ -445,13 +457,6 @@ export const AdminDashboardPage: React.FC = () => {
                     <Icon size={16} className={isActive ? 'text-primary' : 'text-textMuted'} />
                     <span>{item.label}</span>
                   </div>
-                  {'badge' in item && item.badge !== undefined && item.badge > 0 && (
-                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
-                      isActive ? 'bg-primary text-white' : 'bg-borderMain text-textMuted'
-                    }`}>
-                      {item.badge}
-                    </span>
-                  )}
                 </button>
               );
             })}
@@ -1012,293 +1017,58 @@ export const AdminDashboardPage: React.FC = () => {
 
           {activeView === 'claims' && (
             <motion.div key="claims-view" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6 text-left">
-              <h3 className="font-sans font-bold text-base text-textMain">Claims Queue approvals & retrieval checkout</h3>
-
-              {/* Sub tabs switcher */}
-              <div className="flex gap-4 border-b border-borderMain pb-2 text-xs font-bold mb-4">
-                <button
-                  onClick={() => setClaimsSubTab('pending')}
-                  className={`pb-2 border-b-2 px-1 transition-all ${
-                    claimsSubTab === 'pending'
-                      ? 'border-primary text-primary font-extrabold'
-                      : 'border-transparent text-textMuted hover:text-textMain'
-                  }`}
-                >
-                  Pending Verification ({pendingClaims.length})
-                </button>
-                <button
-                  onClick={() => setClaimsSubTab('approved')}
-                  className={`pb-2 border-b-2 px-1 transition-all ${
-                    claimsSubTab === 'approved'
-                      ? 'border-primary text-primary font-extrabold'
-                      : 'border-transparent text-textMuted hover:text-textMain'
-                  }`}
-                >
-                  Approved Awaiting Collection ({approvedClaims.length})
-                </button>
+              <div className="flex justify-between items-center">
+                <h3 className="font-sans font-bold text-base text-textMain">In-Person Handover & Retrieval Logs</h3>
+                <span className="text-xs text-textMuted font-semibold">
+                  {claims.length} total retrievals registered
+                </span>
               </div>
 
-              <div className="space-y-6">
-                {claimsSubTab === 'pending' ? (
-                  <>
-                    {pendingClaims.map(claim => {
-                      const item = claim.lost_items;
-                      if (!item) return null;
-
-                      return (
-                        <div
-                          key={claim.id}
-                          className="bg-white border border-borderMain rounded-3xl p-6 shadow-soft space-y-6 flex flex-col justify-between"
-                        >
-                          {/* Claimant and Item Headers */}
-                          <div className="flex justify-between items-start border-b border-borderMain/50 pb-4 flex-wrap gap-4">
-                            <div className="text-left space-y-1">
-                              <span className="text-[9px] font-bold text-accent uppercase bg-accent-light px-2.5 py-1 rounded-full">
-                                Claim ID: {claim.id}
-                              </span>
-                              <h4 className="font-sans font-bold text-base text-textMain mt-2">
-                                Claim for:{' '}
-                                <span
-                                  onClick={() => {
-                                    setSelectedItemId(item.id);
-                                    setPage('item-details');
-                                  }}
-                                  className="text-primary hover:underline cursor-pointer font-extrabold"
-                                >
-                                  {item.item_name}
-                                </span>
-                              </h4>
-                              <p className="text-xs text-textMuted">Location: {item.found_location} | Category: {item.category}</p>
-                              <p className="text-[10px] text-textMuted">
-                                Submitted Date: {new Date(claim.claim_request_date).toLocaleString()}
-                              </p>
-                              <p className="text-[10px] text-red-500 font-semibold">
-                                Collection Deadline: {new Date(claim.expected_collection_deadline).toLocaleString()} (2 working days limit)
-                              </p>
-                            </div>
-
-                            <div className="text-left text-xs bg-bgMain p-4 border border-borderMain rounded-xl space-y-1 shadow-sm">
-                              <span className="text-textMuted block font-bold uppercase tracking-wider text-[9px]">Claimant roll number</span>
-                              <span className="font-bold text-textMain block font-mono text-xs">{claim.claimant_roll_number}</span>
-                            </div>
-                          </div>
-
-                          {/* Verification responses */}
-                          <div className="space-y-3.5 text-xs">
-                            <h5 className="font-bold text-textMain flex items-center gap-1.5 uppercase tracking-wider text-[10px] text-primary">
-                              <HelpCircle size={14} />
-                              <span>Submitted Verification Answers</span>
-                            </h5>
-
-                            <div className="bg-[#FFF8F9] p-4 rounded-xl border border-borderMain/60 italic text-textMuted leading-relaxed">
-                              "{claim.remarks}"
-                            </div>
-                          </div>
-
-                          {/* Student ID card verification interface */}
-                          <div className="bg-bgMain p-4 border border-borderMain rounded-2xl space-y-3">
-                            <div className="flex justify-between items-center flex-wrap gap-2">
-                              <span className="text-textMuted font-bold uppercase tracking-wider text-[9px]">Student Claimant ID Verification</span>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setActiveClaimIdForScanner(claim.id);
-                                  setScannerContext('claim_verify');
-                                  setShowBarcodeModal(true);
-                                }}
-                                className="text-[10px] px-2.5 py-1.5 bg-primary-light hover:bg-primary text-primary hover:text-white rounded-lg transition-colors flex items-center gap-1 font-bold shadow-sm"
-                              >
-                                <Scan size={10} /> Scan Student ID Barcode
-                              </button>
-                            </div>
-
-                            {/* Manual entry lookup as a fallback */}
-                            <div className="flex gap-2">
-                              <input
-                                type="text"
-                                placeholder="Enter Roll Number manually..."
-                                value={verifyRollInputs[claim.id] || ''}
-                                onChange={(e) => setVerifyRollInputs(prev => ({ ...prev, [claim.id]: e.target.value }))}
-                                className="flex-1 px-3 py-2 text-xs bg-white border border-borderMain rounded-xl focus:outline-none focus:ring-1 focus:ring-primary"
-                              />
-                              <button
-                                type="button"
-                                onClick={() => handleVerifyLookup(claim.id)}
-                                className="px-3.5 py-2 bg-white border border-borderMain hover:border-primary text-textMain hover:text-primary text-xs font-bold rounded-xl transition-all"
-                              >
-                                Lookup
-                              </button>
-                            </div>
-
-                            {verifyMessages[claim.id] && (
-                              <p className="text-[10px] text-amber-600 font-semibold">{verifyMessages[claim.id]}</p>
-                            )}
-
-                            {/* Scanned/Entered student details block */}
-                            {verifiedStudents[claim.id] ? (
-                              <div className="space-y-3 pt-1">
-                                <div className="p-3 bg-white border border-borderMain rounded-xl space-y-1.5 text-[11px] text-textMain">
-                                  <div><span className="text-textMuted font-medium">Name:</span> <strong className="font-bold">{verifiedStudents[claim.id].full_name}</strong></div>
-                                  <div><span className="text-textMuted font-medium">Roll Number:</span> <strong className="font-mono">{verifiedStudents[claim.id].roll_number}</strong></div>
-                                  <div><span className="text-textMuted font-medium">Department:</span> <strong>{verifiedStudents[claim.id].department}</strong> | <span className="text-textMuted font-medium">Year:</span> <strong>{verifiedStudents[claim.id].year}</strong></div>
-                                  <div><span className="text-textMuted font-medium">Email:</span> <strong>{verifiedStudents[claim.id].college_email}</strong></div>
-                                </div>
-
-                                {/* Match check indicator */}
-                                {verifiedStudents[claim.id].roll_number === claim.claimant_roll_number ? (
-                                  <div className="p-2.5 bg-emerald-50 border border-emerald-200 text-emerald-800 text-[10px] font-bold rounded-xl flex items-center gap-1.5">
-                                    <Check size={12} className="text-emerald-600 animate-pulse" />
-                                    <span>✓ MATCH: Student ID verified successfully. Matches the claimant roll number.</span>
-                                  </div>
-                                ) : (
-                                  <div className="p-2.5 bg-red-50 border border-red-200 text-red-800 text-[10px] font-bold rounded-xl flex items-center gap-1.5">
-                                    <X size={12} className="text-red-600" />
-                                    <span>⚠ MISMATCH: Scanned student Roll Number ({verifiedStudents[claim.id].roll_number}) does not match the claimant ({claim.claimant_roll_number}).</span>
-                                  </div>
-                                )}
-                              </div>
-                            ) : (
-                              <div className="p-2.5 bg-white border border-dashed border-borderMain rounded-xl text-center text-[10px] text-textMuted font-medium">
-                                Please scan the barcode or enter roll number manually to verify.
-                              </div>
-                            )}
-                          </div>
-
-                          {/* Verification notes input */}
-                          <div className="space-y-2 text-xs">
-                            <label className="font-bold text-textMain uppercase tracking-wider text-[10px]">Office Verification Notes *</label>
-                            <input
-                              type="text"
-                              placeholder="e.g. Student presented physical ID, verified descriptions of markings."
-                              value={verificationNotes[claim.id] || ''}
-                              onChange={(e) => setVerificationNotes(prev => ({ ...prev, [claim.id]: e.target.value }))}
-                              className="w-full px-4 py-2.5 text-xs bg-bgMain border border-borderMain rounded-xl focus:outline-none focus:ring-1 focus:ring-primary"
-                            />
-                          </div>
-
-                          {/* Action buttons */}
-                          <div className="flex flex-wrap justify-end gap-3 pt-2">
-                            <button
-                              onClick={async () => {
-                                const notes = verificationNotes[claim.id] || 'Manually verified in office.';
-                                await approveClaim(claim.id, notes);
-                              }}
-                              className="px-5 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-bold rounded-xl shadow transition-all flex items-center gap-1.5"
-                            >
-                              <Check size={14} strokeWidth={3} />
-                              Approve Claim
-                            </button>
-                            <button
-                              onClick={async () => {
-                                const reason = prompt('Please enter rejection reason:');
-                                if (reason !== null) {
-                                  await rejectClaim(claim.id, reason);
-                                }
-                              }}
-                              className="px-5 py-2.5 bg-red-50 hover:bg-red-500 text-red-500 hover:text-white border border-red-200 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5"
-                            >
-                              <X size={14} strokeWidth={3} />
-                              Reject Claim
-                            </button>
-                            <button
-                              onClick={async () => {
-                                const notes = verificationNotes[claim.id] || 'Additional verification requested.';
-                                alert(`Requested additional verification for Claim #${claim.id}. Notes: "${notes}". Student has been notified to present additional proof at Safety Office Room 102.`);
-                              }}
-                              className="px-5 py-2.5 bg-amber-50 hover:bg-amber-500 text-amber-600 hover:text-white border border-amber-200 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5"
-                            >
-                              <HelpCircle size={14} />
-                              Request Info
-                            </button>
-                          </div>
-                        </div>
-                      );
-                    })}
-                    {pendingClaims.length === 0 && (
-                      <div className="py-20 bg-white border border-borderMain/60 rounded-2xl text-center text-xs text-textMuted font-bold">
-                        All pending verification queues cleared! Good job.
-                      </div>
-                    )}
-                  </>
-                ) : (
-                  <>
-                    {approvedClaims.map(claim => {
-                      const item = claim.lost_items;
-                      if (!item) return null;
-
-                      return (
-                        <div
-                          key={claim.id}
-                          className="bg-white border border-borderMain rounded-3xl p-6 shadow-soft space-y-6 flex flex-col justify-between"
-                        >
-                          {/* Claimant and Item Headers */}
-                          <div className="flex justify-between items-start border-b border-borderMain/50 pb-4 flex-wrap gap-4">
-                            <div className="text-left space-y-1">
-                              <span className="text-[9px] font-bold text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-100">
-                                Approved Claim ID: {claim.id}
-                              </span>
-                              <h4 className="font-sans font-bold text-base text-textMain mt-2">
-                                Approved Claim for:{' '}
-                                <span
-                                  onClick={() => {
-                                    setSelectedItemId(item.id);
-                                    setPage('item-details');
-                                  }}
-                                  className="text-primary hover:underline cursor-pointer font-extrabold"
-                                >
-                                  {item.item_name}
-                                </span>
-                              </h4>
-                              <p className="text-xs text-textMuted">Location: {item.found_location} | Category: {item.category}</p>
-                              <p className="text-[10px] text-textMuted">
-                                Approved Date: {new Date(claim.claim_request_date).toLocaleString()}
-                              </p>
-                              <p className="text-[10px] text-red-500 font-semibold">
-                                Collection Deadline: {new Date(claim.expected_collection_deadline).toLocaleString()}
-                              </p>
-                              <p className="text-[11px] text-emerald-700 font-bold mt-1 bg-emerald-50/50 p-2.5 border border-emerald-100 rounded-xl w-fit flex items-center gap-1.5">
-                                Receipt Verification Code: <span className="font-mono bg-emerald-500 text-white px-2 py-0.5 rounded shadow-sm">{claim.receipt_code || 'N/A'}</span>
-                              </p>
-                            </div>
-
-                            <div className="text-left text-xs bg-bgMain p-4 border border-borderMain rounded-xl space-y-1 shadow-sm">
-                              <span className="text-textMuted block font-bold uppercase tracking-wider text-[9px]">Claimant roll number</span>
-                              <span className="font-bold text-textMain block font-mono text-xs">{claim.claimant_roll_number}</span>
-                            </div>
-                          </div>
-
-                          {/* Verification notes */}
-                          <div className="space-y-2 text-xs">
-                            <h5 className="font-bold text-textMain uppercase tracking-wider text-[10px] text-primary">Office Verification Notes</h5>
-                            <div className="bg-bgMain p-3.5 rounded-xl border border-borderMain/50 text-textMuted leading-relaxed">
-                              "{claim.verification_notes || 'Approved.'}"
-                            </div>
-                          </div>
-
-                          {/* Action Buttons */}
-                          <div className="flex justify-end gap-3 pt-2">
-                            <button
-                              onClick={async () => {
-                                if (confirm(`Mark this item as physically collected by Student (Roll: ${claim.claimant_roll_number})?\nThis will check out the item and log the retrieval event.`)) {
-                                  await collectClaim(claim.id);
-                                }
-                              }}
-                              className="px-5 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-bold rounded-xl shadow transition-all flex items-center gap-1.5"
-                            >
-                              <Check size={14} strokeWidth={3} />
-                              Mark as Collected & Checked Out
-                            </button>
-                          </div>
-                        </div>
-                      );
-                    })}
-                    {approvedClaims.length === 0 && (
-                      <div className="py-20 bg-white border border-borderMain/60 rounded-2xl text-center text-xs text-textMuted font-bold">
-                        No approved claims waiting for physical collection.
-                      </div>
-                    )}
-                  </>
-                )}
+              <div className="bg-white border border-borderMain rounded-2xl overflow-hidden shadow-soft">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs text-left border-collapse">
+                    <thead>
+                      <tr className="bg-bgMain border-b border-borderMain text-textMuted font-bold uppercase tracking-wider text-[10px]">
+                        <th className="p-4">Retrieval Details</th>
+                        <th className="p-4">Claimant Student</th>
+                        <th className="p-4">Verification Notes</th>
+                        <th className="p-4">Handover Date</th>
+                        <th className="p-4 text-right">Receipt Code</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-borderMain/50">
+                      {claims.map(claim => {
+                        const item = claim.lost_items;
+                        return (
+                          <tr key={claim.id} className="hover:bg-bgMain/30 transition-colors">
+                            <td className="p-4">
+                              <p className="font-bold text-textMain">{item?.item_name || 'Generic Item'}</p>
+                              <p className="text-[10px] text-textMuted font-medium">Category: {item?.category}</p>
+                            </td>
+                            <td className="p-4">
+                              <p className="font-bold text-textMain">Roll: {claim.claimant_roll_number}</p>
+                              <p className="text-[10px] text-textMuted font-medium">Admin: {claim.approved_by || 'Staff'}</p>
+                            </td>
+                            <td className="p-4 max-w-xs truncate font-medium text-textMain" title={claim.verification_notes}>
+                              {claim.verification_notes || 'Physical verification.'}
+                            </td>
+                            <td className="p-4 text-textMuted">
+                              {claim.claimed_date ? new Date(claim.claimed_date).toLocaleDateString() : new Date(claim.claim_request_date).toLocaleDateString()}
+                            </td>
+                            <td className="p-4 text-right font-mono text-emerald-600 font-bold">
+                              {claim.receipt_code || 'REC-887413'}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                      {claims.length === 0 && (
+                        <tr>
+                          <td colSpan={5} className="p-10 text-center text-textMuted font-bold">No handover logs registered.</td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </motion.div>
           )}
@@ -1397,15 +1167,33 @@ export const AdminDashboardPage: React.FC = () => {
                                 </span>
                               </td>
                               <td className="p-4 text-right">
-                                <button
-                                  onClick={() => {
-                                    setSelectedItemId(i.id);
-                                    setPage('item-details');
-                                  }}
-                                  className="px-3 py-1.5 bg-primary-light hover:bg-primary text-primary hover:text-white rounded-lg transition-colors font-bold shadow-sm"
-                                >
-                                  View details
-                                </button>
+                                <div className="flex justify-end gap-2">
+                                  <button
+                                    onClick={() => {
+                                      setSelectedItemId(i.id);
+                                      setPage('item-details');
+                                    }}
+                                    className="px-3 py-1.5 bg-primary-light hover:bg-primary text-primary hover:text-white rounded-lg transition-colors font-bold shadow-sm"
+                                  >
+                                    View details
+                                  </button>
+                                  {(i.status === 'Waiting for Owner' || i.status === 'Claim Requested') && (
+                                    <button
+                                      onClick={() => {
+                                        setCheckoutItemId(i.id);
+                                        setCheckoutRoll('');
+                                        setCheckoutNotes('');
+                                        setCheckoutError('');
+                                        setCheckoutSuccess(false);
+                                        setShowCheckoutModal(true);
+                                      }}
+                                      className="px-3 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg transition-colors font-bold shadow-sm flex items-center gap-1"
+                                    >
+                                      <CheckCircle size={12} />
+                                      Handover
+                                    </button>
+                                  )}
+                                </div>
                               </td>
                             </tr>
                           );
@@ -1851,6 +1639,121 @@ export const AdminDashboardPage: React.FC = () => {
                   </button>
                 </div>
               </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* DIRECT CHECKOUT / HANDOVER MODAL */}
+      <AnimatePresence>
+        {showCheckoutModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowCheckoutModal(false)}
+              className="absolute inset-0 bg-neutral-950/40 backdrop-blur-sm"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="relative w-full max-w-md bg-white border border-borderMain rounded-3xl p-6 shadow-premium z-10 text-left space-y-4"
+            >
+              <h3 className="font-sans font-extrabold text-lg text-textMain flex items-center gap-2">
+                <CheckCircle className="text-emerald-500" size={22} />
+                Physical Item Handover Checkout
+              </h3>
+
+              {checkoutSuccess ? (
+                <div className="py-8 text-center space-y-3">
+                  <div className="w-12 h-12 bg-emerald-50 text-emerald-500 rounded-full flex items-center justify-center mx-auto animate-bounce">
+                    <Check size={24} strokeWidth={3} />
+                  </div>
+                  <h4 className="font-bold text-sm text-textMain">Checkout Handover Completed</h4>
+                  <p className="text-xs text-textMuted">The item has been successfully marked as Collected and the claim record is archived.</p>
+                </div>
+              ) : (
+                <form onSubmit={handleDirectCheckoutSubmit} className="space-y-4 text-xs">
+                  <div className="space-y-1">
+                    <label className="font-bold text-textMain block">Student Roll Number *</label>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        placeholder="Enter roll number (e.g. 505050)..."
+                        value={checkoutRoll}
+                        onChange={(e) => {
+                          setCheckoutRoll(e.target.value);
+                          setCheckoutStudentInfo(null);
+                        }}
+                        className="flex-1 px-3 py-2 bg-bgMain border border-borderMain rounded-xl text-xs font-semibold focus:outline-none"
+                        required
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setScannerContext('claim_verify');
+                          setShowBarcodeModal(true);
+                        }}
+                        className="px-3 py-2 bg-bgMain border border-borderMain hover:border-primary text-textMain hover:text-primary rounded-xl transition-all flex items-center gap-1 font-bold animate-pulse"
+                      >
+                        <Scan size={12} /> Scan
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleCheckoutStudentLookup(checkoutRoll)}
+                        className="px-4 py-2 bg-primary-light hover:bg-primary text-primary hover:text-white text-xs font-bold rounded-xl transition-all"
+                      >
+                        Verify ID
+                      </button>
+                    </div>
+                    {checkoutStudentLookupMsg && (
+                      <p className="text-[10px] text-amber-600 font-semibold mt-1">{checkoutStudentLookupMsg}</p>
+                    )}
+                  </div>
+
+                  {checkoutStudentInfo && (
+                    <div className="p-3.5 bg-emerald-50/50 border border-emerald-100 rounded-xl space-y-1 text-[10px] text-emerald-800">
+                      <span className="font-bold block uppercase tracking-wider text-[9px] text-emerald-700">Verified Student Credentials</span>
+                      <div>Name: <strong>{checkoutStudentInfo.full_name}</strong></div>
+                      <div>Dept: <strong>{checkoutStudentInfo.department}</strong> | Year: <strong>{checkoutStudentInfo.year}</strong></div>
+                    </div>
+                  )}
+
+                  <div className="space-y-1">
+                    <label className="font-bold text-textMain block">Office Verification Notes *</label>
+                    <textarea
+                      rows={3}
+                      placeholder="e.g. Verified ownership by matching phone password / serial keys / bag contents. Student signed physical log."
+                      value={checkoutNotes}
+                      onChange={(e) => setCheckoutNotes(e.target.value)}
+                      className="w-full px-3 py-2 bg-bgMain border border-borderMain rounded-xl focus:outline-none resize-none"
+                      required
+                    />
+                  </div>
+
+                  {checkoutError && (
+                    <p className="text-[10px] text-red-500 font-bold">{checkoutError}</p>
+                  )}
+
+                  <div className="flex justify-end gap-2 pt-2">
+                    <button
+                      type="submit"
+                      className="px-5 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white font-bold rounded-xl shadow transition-all"
+                    >
+                      Complete Handover
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowCheckoutModal(false)}
+                      className="px-5 py-2.5 bg-white border border-borderMain rounded-xl text-textMain"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </form>
+              )}
             </motion.div>
           </div>
         )}

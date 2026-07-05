@@ -3,7 +3,7 @@ import { useApp } from '../context/AppContext';
 import { Timeline } from '../components/Timeline';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
-  ArrowLeft, ShieldAlert, CheckCircle, PackageOpen, HelpCircle, UserCheck,
+  ArrowLeft, ShieldAlert, CheckCircle, PackageOpen, HelpCircle,
   ChevronLeft, ChevronRight, Maximize2, X, Trash2, Edit, Loader2, MapPin
 } from 'lucide-react';
 import { ImageUpload } from '../components/ImageUpload';
@@ -14,18 +14,11 @@ export const ItemDetailsPage: React.FC = () => {
     items,
     selectedItemId,
     setPage,
-    activeStudent,
-    submitClaim,
     claims,
     currentUser,
     editItem,
     deleteItem
   } = useApp();
-
-  const [isClaiming, setIsClaiming] = useState(false);
-  const [remarks, setRemarks] = useState('');
-  const [formError, setFormError] = useState('');
-  const [submitSuccess, setSubmitSuccess] = useState(false);
 
   // Gallery states
   const [currentImgIndex, setCurrentImgIndex] = useState(0);
@@ -138,31 +131,6 @@ export const ItemDetailsPage: React.FC = () => {
 
   // Active claim for this item
   const activeClaim = claims.find(c => c.item_id === item.id && c.approval_status !== 'rejected');
-
-  const handleClaimSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!remarks.trim()) {
-      setFormError('Please describe the unique identifying details of the item.');
-      return;
-    }
-    if (!activeStudent) {
-      setFormError('You must be logged in as a student to file a claim.');
-      return;
-    }
-
-    const success = await submitClaim(item.id, activeStudent.roll_number, remarks);
-    if (success) {
-      setSubmitSuccess(true);
-      setRemarks('');
-      setFormError('');
-      setTimeout(() => {
-        setSubmitSuccess(false);
-        setIsClaiming(false);
-      }, 3000);
-    } else {
-      setFormError('Failed to submit claim request. Please check if another claim is active.');
-    }
-  };
 
   const handleDeleteItem = async () => {
     setDeleteLoading(true);
@@ -441,9 +409,7 @@ export const ItemDetailsPage: React.FC = () => {
                   {item.notes}
                 </p>
               </div>
-            )}
-
-            {/* ACTION TRIGGERS */}
+            )}            {/* ACTION TRIGGERS */}
             <div className="border-t border-borderMain/50 pt-6">
               <AnimatePresence mode="wait">
                 {item.status === 'Claimed & Collected' ? (
@@ -461,97 +427,38 @@ export const ItemDetailsPage: React.FC = () => {
                       </p>
                     </div>
                   </motion.div>
-                ) : item.status === 'Claim Requested' ? (
+                ) : item.type === 'lost' ? (
                   <motion.div
-                    key="claiming-state"
+                    key="lost-state"
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
-                    className="p-4 bg-amber-50 border border-amber-200 rounded-xl flex items-start gap-3"
+                    className="p-4 bg-rose-50 border border-rose-100 rounded-xl flex items-start gap-3"
                   >
-                    <HelpCircle className="text-amber-500 shrink-0" size={18} />
+                    <HelpCircle className="text-rose-500 shrink-0" size={18} />
                     <div className="space-y-1 text-left">
-                      <p className="text-xs font-bold text-amber-800">Claim Requested (Awaiting Verification)</p>
-                      <p className="text-[10px] text-amber-700 leading-relaxed font-medium">
-                        A claimant has filed ownership. The safety office requires the claimant to visit the campus office within <strong>2 working days</strong> for physical collection.
+                      <p className="text-xs font-bold text-rose-800">Lost Report Active</p>
+                      <p className="text-[10px] text-rose-700 leading-relaxed">
+                        This lost item report is active. If someone submits a matching item to the physical Safety Office, the staff will register it and update this record.
                       </p>
                     </div>
                   </motion.div>
-                ) : isClaiming ? (
-                  <motion.form
-                    key="claiming-form"
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: 'auto' }}
-                    exit={{ opacity: 0, height: 0 }}
-                    onSubmit={handleClaimSubmit}
-                    className="space-y-4 text-xs text-left"
-                  >
-                    {submitSuccess ? (
-                      <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center gap-2">
-                        <CheckCircle size={16} className="text-emerald-500" />
-                        <span className="text-emerald-800 font-bold">Claim submitted successfully!</span>
-                      </div>
-                    ) : (
-                      <>
-                        <div className="bg-primary-light/40 p-4 rounded-xl border border-primary/10 space-y-2">
-                          <p className="text-[11px] text-primary font-bold flex items-center gap-1.5">
-                            <UserCheck size={14} />
-                            <span>Claimant Credentials (Auto-Populated)</span>
-                          </p>
-                          <div className="grid grid-cols-2 gap-2 text-[10px] text-textMuted">
-                            <span>Name: <strong className="text-textMain">{activeStudent?.full_name}</strong></span>
-                            <span>Roll Number: <strong className="text-textMain">{activeStudent?.roll_number}</strong></span>
-                            <span>Department: <strong className="text-textMain">{activeStudent?.department}</strong></span>
-                            <span>Year / Sec: <strong className="text-textMain">{activeStudent?.year} ({activeStudent?.section})</strong></span>
-                          </div>
-                        </div>
-
-                        <div className="space-y-1.5">
-                          <label className="font-bold text-textMain">Ownership Verification Details</label>
-                          <textarea
-                            rows={3}
-                            placeholder="Describe any unique stickers, casing features, scratches, purchase details, or contents inside/on the item to verify ownership..."
-                            value={remarks}
-                            onChange={(e) => setRemarks(e.target.value)}
-                            className="w-full px-3 py-2 text-xs bg-white border border-borderMain rounded-xl focus:outline-none focus:ring-1 focus:ring-primary resize-none"
-                          />
-                        </div>
-
-                        {formError && <p className="text-[10px] text-red-500 font-bold">{formError}</p>}
-
-                        <div className="flex gap-2">
-                          <button
-                            type="submit"
-                            className="flex-1 py-2 bg-primary hover:bg-primary-hover text-white text-xs font-bold rounded-xl transition-all shadow-sm"
-                          >
-                            Submit Claim Details
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setIsClaiming(false)}
-                            className="px-4 py-2 bg-white border border-borderMain rounded-xl text-textMain text-xs font-semibold hover:bg-bgMain"
-                          >
-                            Cancel
-                          </button>
-                        </div>
-                      </>
-                    )}
-                  </motion.form>
                 ) : (
-                  <motion.div key="claim-trigger" className="space-y-3">
-                    <button
-                      onClick={() => {
-                        if (!activeStudent) {
-                          setPage('landing');
-                          window.scrollTo(0, 0);
-                        } else {
-                          setIsClaiming(true);
-                        }
-                      }}
-                      className="w-full py-3 bg-primary hover:bg-primary-hover text-white text-xs font-bold rounded-xl shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-1.5 hover:scale-102"
-                    >
-                      <PackageOpen size={16} />
-                      Claim Ownership of Item
-                    </button>
+                  <motion.div
+                    key="collection-instructions"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="p-4 bg-primary-light/35 border border-primary/20 rounded-xl flex items-start gap-3"
+                  >
+                    <PackageOpen className="text-primary shrink-0 animate-pulse" size={18} />
+                    <div className="space-y-1 text-left">
+                      <p className="text-xs font-bold text-primary">In-Person Retrieval Required</p>
+                      <p className="text-[10px] text-textMuted leading-relaxed">
+                        To claim and retrieve this item, please visit the <strong>Campus Safety & Lost & Found Office (Room 102)</strong> physically.
+                      </p>
+                      <p className="text-[10px] text-textMuted leading-relaxed mt-1 font-semibold">
+                        Make sure to bring your Student ID Card. You will be asked to verify details, keys, passwords, or markings to prove ownership before checkout.
+                      </p>
+                    </div>
                   </motion.div>
                 )}
               </AnimatePresence>

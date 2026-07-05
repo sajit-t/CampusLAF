@@ -127,7 +127,7 @@ interface AppContextType {
   deleteItem: (id: string) => Promise<boolean>;
 
   // Claim Actions
-  submitClaim: (itemId: string, rollNumber: string, answers: string) => Promise<boolean>;
+  checkoutItem: (itemId: string, rollNumber: string, verificationNotes: string) => Promise<boolean>;
   approveClaim: (claimId: string, notes: string) => Promise<boolean>;
   rejectClaim: (claimId: string, remarks: string) => Promise<boolean>;
   cancelClaim: (claimId: string) => Promise<boolean>;
@@ -463,16 +463,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   // 5. Claims Processing
-  const submitClaim = async (itemId: string, rollNumber: string, answers: string): Promise<boolean> => {
+  const checkoutItem = async (itemId: string, rollNumber: string, verificationNotes: string): Promise<boolean> => {
     setErrorMsg(null);
     try {
-      await apiRequest('/api/claims', 'POST', {
+      await apiRequest('/api/claims/checkout', 'POST', {
         item_id: itemId,
         roll_number: rollNumber,
-        remarks: answers
+        verification_notes: verificationNotes
       });
       fetchItems();
       fetchClaims();
+      fetchAnalytics();
       return true;
     } catch (err: any) {
       setErrorMsg(err.message);
@@ -578,7 +579,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       registerItem,
       editItem,
       deleteItem,
-      submitClaim,
+      checkoutItem,
       approveClaim,
       rejectClaim,
       cancelClaim,

@@ -18,15 +18,15 @@ export const HowItWorks: React.FC = () => {
       badge: 'Step 2'
     },
     {
-      title: 'Claim Ownership',
-      desc: 'Students browse the available catalog, select their item, submit verification answers, and trigger validation checks.',
+      title: 'Identify Belongings',
+      desc: 'Browse the active office catalog, locate your lost item, and review the storage location details.',
       icon: ShieldAlert,
       color: 'bg-emerald-50 text-emerald-600 border-emerald-100',
       badge: 'Step 3'
     },
     {
-      title: 'Verification & Collection',
-      desc: 'Visit the office, scan student barcode, confirm answers, sign receipt code, and check out your recovered property.',
+      title: 'In-Person Retrieval',
+      desc: 'Visit the Safety Office Room 102 physically, verify ownership details with the staff, and check out your item.',
       icon: BadgeCheck,
       color: 'bg-indigo-50 text-indigo-600 border-indigo-100',
       badge: 'Step 4'

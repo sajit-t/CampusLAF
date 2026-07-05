@@ -209,7 +209,7 @@ export const DashboardPage: React.FC = () => {
     { id: 'lost', label: 'Browse Found Items', icon: Bookmark, badge: availableFoundCount > 0 ? availableFoundCount : undefined },
     { id: 'lost-reports', label: 'My Lost Reports', icon: FileText, badge: myLostReportsCount > 0 ? myLostReportsCount : undefined },
     { id: 'report', label: 'Report Lost Item', icon: PlusCircle },
-    { id: 'claims', label: 'My Claims History', icon: FileCheck, badge: myClaimsCount > 0 ? myClaimsCount : undefined },
+    { id: 'claims', label: 'My Handover History', icon: FileCheck, badge: myClaimsCount > 0 ? myClaimsCount : undefined },
     { id: 'profile', label: 'My Profile', icon: User },
     { id: 'settings', label: 'Portal Configs', icon: Settings },
   ];
@@ -292,7 +292,7 @@ export const DashboardPage: React.FC = () => {
               Good Morning, {activeStudent?.full_name || currentUser?.name || 'Student'} 👋
             </h2>
             <p className="text-xs text-textMuted mt-1 font-medium">
-              Browse lost reports, claim items, or track status of your verification queues.
+              Browse lost reports, view the found catalog, or check your handover receipts.
             </p>
           </div>
 
@@ -342,7 +342,7 @@ export const DashboardPage: React.FC = () => {
                 {[
                   { label: 'My Lost Reports', val: myLostReportsCount, border: 'border-l-rose-500' },
                   { label: 'Available Found Items', val: availableFoundCount, border: 'border-l-primary' },
-                  { label: 'My Claims History', val: myClaimsCount, border: 'border-l-indigo-500' },
+                  { label: 'My Handover History', val: myClaimsCount, border: 'border-l-indigo-500' },
                   { label: 'My Collected Items', val: claims.filter(c => c.approval_status === 'approved' && c.claimed_date).length, border: 'border-l-emerald-500' },
                 ].map(stat => (
                   <div key={stat.label} className={`bg-white p-4 md:p-5 rounded-2xl border border-borderMain/60 shadow-soft border-l-4 ${stat.border} text-left`}>
@@ -607,7 +607,7 @@ export const DashboardPage: React.FC = () => {
               exit={{ opacity: 0 }}
               className="space-y-6 text-left"
             >
-              <h3 className="font-sans font-bold text-lg text-textMain">Claims Ownership Log</h3>
+              <h3 className="font-sans font-bold text-lg text-textMain">My Handover & Retrieval Log</h3>
 
               <div className="space-y-4">
                 {claims.map(claim => (
@@ -620,21 +620,13 @@ export const DashboardPage: React.FC = () => {
                         <h4 className="font-sans font-bold text-sm text-textMain">
                           {claim.lost_items ? claim.lost_items.item_name : 'Lost Item'}
                         </h4>
-                        <span className={`text-[9px] font-extrabold px-2 py-0.5 rounded-full ${
-                          claim.approval_status === 'approved' ? 'bg-emerald-150 text-emerald-600' :
-                          claim.approval_status === 'rejected' ? 'bg-red-50 text-red-500' :
-                          claim.approval_status === 'expired' ? 'bg-neutral-100 text-neutral-600' :
-                          'bg-yellow-50 text-yellow-600'
-                        }`}>
-                          {claim.approval_status.toUpperCase()}
+                        <span className={`text-[9px] font-extrabold px-2 py-0.5 rounded-full bg-emerald-150 text-emerald-600`}>
+                          RETRIEVED
                         </span>
                       </div>
 
-                      <p className="text-xs text-textMuted">
-                        Deadline to claim in office:{' '}
-                        <strong className="text-textMain">
-                          {new Date(claim.expected_collection_deadline).toLocaleString()}
-                        </strong>
+                      <p className="text-xs text-emerald-600 font-semibold">
+                        Retrieved and Handed Over physically on: <strong>{claim.claimed_date ? new Date(claim.claimed_date).toLocaleDateString() : new Date(claim.claim_request_date).toLocaleDateString()}</strong>
                       </p>
 
                       {claim.receipt_code && (
@@ -645,10 +637,7 @@ export const DashboardPage: React.FC = () => {
                     </div>
 
                     <div className="text-right text-[10px] text-textMuted space-y-1">
-                      <span>Submitted: {new Date(claim.claim_request_date).toLocaleDateString()}</span>
-                      {claim.claimed_date && (
-                        <span className="block text-emerald-600">Collected: {new Date(claim.claimed_date).toLocaleDateString()}</span>
-                      )}
+                      <span>Recorded: {new Date(claim.claim_request_date).toLocaleDateString()}</span>
                     </div>
                   </div>
                 ))}

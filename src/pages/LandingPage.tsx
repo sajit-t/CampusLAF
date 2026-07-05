@@ -162,7 +162,7 @@ export const LandingPage: React.FC = () => {
             Have you lost an item on campus?
           </h3>
           <p className="text-xs text-textMuted max-w-lg mx-auto leading-relaxed">
-            Report details immediately to help safety officers log your lost items and correlate claims. Choose the option below to begin:
+            Report details immediately to help safety officers log your lost items and match them against incoming found property. Choose the option below to begin:
           </p>
 
           <div className="flex gap-4 justify-center max-w-xs mx-auto pt-2">
