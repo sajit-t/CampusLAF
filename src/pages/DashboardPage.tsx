@@ -270,7 +270,7 @@ export const DashboardPage: React.FC = () => {
                         className="bg-white border border-borderMain rounded-2xl overflow-hidden shadow-soft hover:shadow-hover hover:-translate-y-0.5 transition-all cursor-pointer flex flex-col justify-between"
                       >
                         <div className="relative h-36 bg-borderMain/10">
-                          <img src={item.images[0]} alt={item.item_name} className="w-full h-full object-cover" />
+                          <img src={item.images && item.images.length > 0 ? item.images[0] : '/uploads/placeholder.jpg'} alt={item.item_name} className="w-full h-full object-cover" />
                           <span className={`absolute top-2.5 right-2.5 text-[9px] font-extrabold px-2.5 py-0.5 rounded-full ${
                             item.status === 'Claimed & Collected'
                               ? 'bg-emerald-100 text-emerald-600'
@@ -405,7 +405,7 @@ export const DashboardPage: React.FC = () => {
                       className="bg-white border border-borderMain rounded-2xl overflow-hidden shadow-soft hover:shadow-hover hover:-translate-y-1 transition-all cursor-pointer flex flex-col justify-between"
                     >
                       <div className="relative h-44 bg-borderMain/10">
-                        <img src={item.images[0]} alt={item.item_name} className="w-full h-full object-cover" />
+                        <img src={item.images && item.images.length > 0 ? item.images[0] : '/uploads/placeholder.jpg'} alt={item.item_name} className="w-full h-full object-cover" />
                         <span className={`absolute top-3 right-3 text-[10px] font-bold px-2 py-0.5 rounded-full ${
                           item.status === 'Claimed & Collected'
                             ? 'bg-emerald-100 text-emerald-600'

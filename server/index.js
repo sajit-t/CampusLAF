@@ -10,7 +10,26 @@ import claimRouter from './routes/claims.js';
 import logsRouter from './routes/logs.js';
 import { startWorker } from './worker.js';
 
+import { supabase } from './db.js';
+
 dotenv.config();
+
+// Initialize Supabase Storage bucket on boot
+async function initStorage() {
+  try {
+    const { data: buckets, error: listError } = await supabase.storage.listBuckets();
+    if (listError) throw listError;
+    const exists = buckets.some(b => b.name === 'lost-found-images');
+    if (!exists) {
+      const { error: createError } = await supabase.storage.createBucket('lost-found-images', { public: true });
+      if (createError) throw createError;
+      console.log('Created Supabase Storage Bucket: lost-found-images');
+    }
+  } catch (err) {
+    console.error('Failed to initialize Supabase Storage bucket:', err.message);
+  }
+}
+initStorage();
 
 const app = express();
 const PORT = process.env.PORT || 5000;

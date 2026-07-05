@@ -1,44 +1,76 @@
 import express from 'express';
 import multer from 'multer';
 import path from 'path';
-import fs from 'fs';
-import { db } from '../db.js';
+import crypto from 'crypto';
+import { db, supabase } from '../db.js';
 import { authenticateToken, authorizeRole } from '../middleware.js';
 
 const router = express.Router();
 
-// File upload setup
-const uploadDir = './server/uploads';
-try {
-  if (!fs.existsSync(uploadDir)) {
-    fs.mkdirSync(uploadDir, { recursive: true });
-  }
-} catch (err) {
-  console.warn('Unable to create upload directory (could be read-only filesystem):', err.message);
-}
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, uploadDir);
-  },
-  filename: (req, file, cb) => {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
-    cb(null, uniqueSuffix + path.extname(file.originalname));
-  }
-});
-
+// File upload setup using Memory Storage for serverless compatibility
+const storage = multer.memoryStorage();
 const upload = multer({
   storage,
   limits: { fileSize: 5 * 1024 * 1024 } // 5MB limit
 });
 
+// Helper: Extract Supabase storage path from Public URL
+const getStoragePathFromUrl = (url) => {
+  if (!url) return null;
+  const marker = '/storage/v1/object/public/lost-found-images/';
+  const index = url.indexOf(marker);
+  if (index !== -1) {
+    return url.substring(index + marker.length);
+  }
+  return null;
+};
+
 // Image Upload Endpoint (Admins only)
-router.post('/upload', authenticateToken, authorizeRole(['admin', 'super_admin']), upload.array('files', 5), (req, res) => {
+router.post('/upload', authenticateToken, authorizeRole(['admin', 'super_admin']), upload.array('files', 5), async (req, res) => {
   try {
-    const urls = req.files.map(file => `/uploads/${file.filename}`);
+    if (!req.files || req.files.length === 0) {
+      return res.status(400).json({ error: 'No files uploaded' });
+    }
+
+    const urls = [];
+
+    for (const file of req.files) {
+      // 1. Validation: Verify MIME type
+      const allowedMimes = ['image/jpeg', 'image/png', 'image/webp'];
+      if (!allowedMimes.includes(file.mimetype)) {
+        return res.status(400).json({ error: `File type ${file.mimetype} is not supported. Use JPG, PNG or WEBP.` });
+      }
+
+      // 2. Generate UUID-based unique filename
+      const fileExt = path.extname(file.originalname).toLowerCase() || '.jpg';
+      const uuidFilename = `${crypto.randomUUID()}${fileExt}`;
+      const storagePath = `items/${uuidFilename}`;
+
+      // 3. Upload buffer to Supabase Storage
+      const { data, error } = await supabase.storage
+        .from('lost-found-images')
+        .upload(storagePath, file.buffer, {
+          contentType: file.mimetype,
+          upsert: false
+        });
+
+      if (error) {
+        console.error('Supabase upload error:', error);
+        return res.status(500).json({ error: 'Failed to upload image to storage' });
+      }
+
+      // 4. Retrieve Public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('lost-found-images')
+        .getPublicUrl(storagePath);
+
+      urls.push(publicUrl);
+    }
+
     res.json({ urls });
   } catch (error) {
     console.error('Upload error:', error);
-    res.status(500).json({ error: 'Failed to upload attachments' });
+    res.status(500).json({ error: 'Failed to process and upload attachments' });
   }
 });
 
@@ -289,6 +321,25 @@ router.put('/:id', authenticateToken, authorizeRole(['admin', 'super_admin']), a
     const item = await db.items.findById(id);
     if (!item) return res.status(404).json({ error: 'Item not found' });
 
+    // Clean up deleted images in Supabase Storage if images list is updated
+    if (updateFields.images) {
+      const oldImages = item.images || [];
+      const newImages = updateFields.images || [];
+      const deletedImages = oldImages.filter(img => !newImages.includes(img));
+      const deletedPaths = deletedImages.map(url => getStoragePathFromUrl(url)).filter(Boolean);
+
+      if (deletedPaths.length > 0) {
+        const { error: removeError } = await supabase.storage
+          .from('lost-found-images')
+          .remove(deletedPaths);
+        if (removeError) {
+          console.warn('Failed to remove deleted images from storage:', removeError);
+        } else {
+          console.log('Cleaned up replaced/deleted images from storage:', deletedPaths);
+        }
+      }
+    }
+
     const updated = await db.items.update(id, updateFields);
 
     // Log action
@@ -314,6 +365,21 @@ router.delete('/:id', authenticateToken, authorizeRole(['admin', 'super_admin'])
   try {
     const item = await db.items.findById(id);
     if (!item) return res.status(404).json({ error: 'Item not found' });
+
+    // Clean up all images in Supabase Storage before database deletion
+    const oldImages = item.images || [];
+    const imagePaths = oldImages.map(url => getStoragePathFromUrl(url)).filter(Boolean);
+
+    if (imagePaths.length > 0) {
+      const { error: removeError } = await supabase.storage
+        .from('lost-found-images')
+        .remove(imagePaths);
+      if (removeError) {
+        console.warn('Failed to remove item images from storage on delete:', removeError);
+      } else {
+        console.log('Cleaned up all images from storage for deleted item:', imagePaths);
+      }
+    }
 
     await db.items.delete(id);
 

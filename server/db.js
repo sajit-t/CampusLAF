@@ -11,7 +11,7 @@ if (!supabaseUrl || !supabaseKey) {
 }
 
 console.log('Database Mode: SUPABASE ONLY');
-const supabase = createClient(supabaseUrl, supabaseKey);
+export const supabase = createClient(supabaseUrl, supabaseKey);
 
 // Unified Database Adapter Export for Supabase
 export const db = {

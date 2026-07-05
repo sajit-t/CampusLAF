@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import type { Student } from '../context/AppContext';
+import { ImageUpload } from '../components/ImageUpload';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Shield, Check, X, HelpCircle, FileText, Users, FileCheck, Sliders,
@@ -106,6 +107,8 @@ export const AdminDashboardPage: React.FC = () => {
   const [itemTime, setItemTime] = useState('12:00');
   const [itemNotes, setItemNotes] = useState('');
   const [itemSuccessMsg, setItemSuccessMsg] = useState('');
+  const [receiveFiles, setReceiveFiles] = useState<File[]>([]);
+
   const [showBarcodeModal, setShowBarcodeModal] = useState(false);
 
   // Claims process notes
@@ -197,7 +200,7 @@ export const AdminDashboardPage: React.FC = () => {
       notes: itemNotes
     };
 
-    const success = await registerItem(payload, []);
+    const success = await registerItem(payload, receiveFiles);
     if (success) {
       setItemSuccessMsg('Item logged successfully and published to student dashboards!');
       // Reset fields
@@ -214,6 +217,7 @@ export const AdminDashboardPage: React.FC = () => {
       setItemNotes('');
       setSelectedLocOption('');
       setCustomLoc('');
+      setReceiveFiles([]);
       setTimeout(() => setItemSuccessMsg(''), 4000);
     }
   };
@@ -881,6 +885,16 @@ export const AdminDashboardPage: React.FC = () => {
                       value={itemNotes}
                       onChange={(e) => setItemNotes(e.target.value)}
                       className="w-full px-3 py-2 text-xs bg-bgMain border border-borderMain rounded-xl focus:outline-none focus:ring-1 focus:ring-primary"
+                    />
+                  </div>
+
+                  {/* Image Upload Component */}
+                  <div className="pt-2 border-t border-borderMain/50">
+                    <ImageUpload
+                      files={receiveFiles}
+                      onChange={setReceiveFiles}
+                      maxFiles={5}
+                      maxSizeMB={5}
                     />
                   </div>
                 </div>
