@@ -48,10 +48,12 @@ if (fs.existsSync(distPath)) {
   });
 }
 
-// Start Lifecycle Daemon Worker
-startWorker();
+// Only start the worker and listener when running outside Vercel (local dev/production server)
+if (!process.env.VERCEL) {
+  startWorker();
+  app.listen(PORT, () => {
+    console.log(`Server is running on http://localhost:${PORT}`);
+  });
+}
 
-// Start Server listening
-app.listen(PORT, () => {
-  console.log(`Server is running on http://localhost:${PORT}`);
-});
+export default app;
