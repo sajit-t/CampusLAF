@@ -135,18 +135,20 @@ router.put('/:id/approve', authenticateToken, async (req, res) => {
     }
 
     const receiptCode = 'REC-' + Math.floor(100000 + Math.random() * 900000);
+    const deadline = getCollectionDeadline(2); // 2 working days collection deadline from approval time
     
     // Update claim
     const updatedClaim = await db.claims.update(id, {
       approval_status: 'approved',
       approved_by: req.user.id,
-      claimed_date: new Date().toISOString(),
+      claimed_date: null, // Keep null until physically collected
+      expected_collection_deadline: deadline,
       verification_notes: verification_notes || 'Manually verified by safety admin.',
       receipt_code: receiptCode
     });
 
-    // Update item status to 'Claimed & Collected'
-    await db.items.setStatus(claim.item_id, 'Claimed & Collected');
+    // Update item status to 'Claim Requested' (maps to 'Claim Approved' in UI since claim is approved but claimed_date is null)
+    await db.items.setStatus(claim.item_id, 'Claim Requested');
 
     // Log action
     await db.logs.create({
@@ -249,6 +251,51 @@ router.put('/:id/cancel', authenticateToken, async (req, res) => {
   } catch (error) {
     console.error('Cancel claim error:', error);
     res.status(500).json({ error: 'Server error cancelling claim' });
+  }
+});
+
+// 7. PUT /api/claims/:id/collect - Mark Claim as Collected (Admins only)
+router.put('/:id/collect', authenticateToken, async (req, res) => {
+  const { id } = req.params;
+
+  if (req.user.role === 'student') {
+    return res.status(403).json({ error: 'Access denied: Admin only' });
+  }
+
+  try {
+    const claim = await db.claims.findById(id);
+    if (!claim) return res.status(404).json({ error: 'Claim not found' });
+
+    if (claim.approval_status !== 'approved') {
+      return res.status(400).json({ error: 'Cannot collect an unapproved claim' });
+    }
+
+    if (claim.claimed_date) {
+      return res.status(400).json({ error: 'Claim has already been collected' });
+    }
+
+    // Update claim: set claimed_date to current time
+    const updatedClaim = await db.claims.update(id, {
+      claimed_date: new Date().toISOString()
+    });
+
+    // Update item status to 'Claimed & Collected'
+    await db.items.setStatus(claim.item_id, 'Claimed & Collected');
+
+    // Log action
+    await db.logs.create({
+      performed_by: req.user.id,
+      action: 'COLLECT_CLAIM',
+      affected_record_table: 'claims',
+      affected_record_id: id,
+      details: { item_id: claim.item_id, claimant: claim.claimant_roll_number }
+    });
+
+    res.json(updatedClaim);
+
+  } catch (error) {
+    console.error('Collect claim error:', error);
+    res.status(500).json({ error: 'Server error marking claim as collected' });
   }
 });
 

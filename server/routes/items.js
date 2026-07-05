@@ -25,8 +25,8 @@ const getStoragePathFromUrl = (url) => {
   return null;
 };
 
-// Image Upload Endpoint (Admins only)
-router.post('/upload', authenticateToken, authorizeRole(['admin', 'super_admin']), upload.array('files', 5), async (req, res) => {
+// Image Upload Endpoint (Student & Admins)
+router.post('/upload', authenticateToken, authorizeRole(['student', 'admin', 'super_admin']), upload.array('files', 5), async (req, res) => {
   try {
     if (!req.files || req.files.length === 0) {
       return res.status(400).json({ error: 'No files uploaded' });
@@ -101,8 +101,12 @@ router.get('/search', authenticateToken, async (req, res) => {
 
     // Filter visible items
     const visibleItems = allItems.filter(item => {
-      if (isUserAdmin) return true; // Admins see everything
-      return item.status !== 'Archived'; // Students don't see archived items
+      const isLostReport = item.notes?.startsWith('[LOST]');
+      if (isLostReport) {
+        return isUserAdmin || (item.found_by_roll_number === req.user.roll_number);
+      }
+      if (isUserAdmin) return true;
+      return item.status === 'Waiting for Owner';
     });
 
     if (!cleanQuery) {
@@ -213,8 +217,12 @@ router.get('/', authenticateToken, async (req, res) => {
 
     // Limit visibility to students
     const visible = items.filter(item => {
+      const isLostReport = item.notes?.startsWith('[LOST]');
+      if (isLostReport) {
+        return isUserAdmin || (item.found_by_roll_number === req.user.roll_number);
+      }
       if (isUserAdmin) return true;
-      return item.status !== 'Archived';
+      return item.status === 'Waiting for Owner';
     });
 
     res.json(visible);

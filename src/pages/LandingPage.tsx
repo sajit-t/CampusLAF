@@ -159,26 +159,19 @@ export const LandingPage: React.FC = () => {
       <section className="py-12 px-4 bg-white border-t border-b border-borderMain/50">
         <div className="max-w-4xl mx-auto text-center space-y-6">
           <h3 className="text-lg md:text-xl font-sans font-bold text-textMain tracking-tight">
-            Have you lost an item or found someone else's property?
+            Have you lost an item on campus?
           </h3>
           <p className="text-xs text-textMuted max-w-lg mx-auto leading-relaxed">
-            Report detail logs immediately to help safety officers correlate claims. Choose the appropriate log form below to begin:
+            Report details immediately to help safety officers log your lost items and correlate claims. Choose the option below to begin:
           </p>
 
-          <div className="flex flex-col sm:flex-row gap-4 justify-center max-w-md mx-auto pt-2">
+          <div className="flex gap-4 justify-center max-w-xs mx-auto pt-2">
             <button
               onClick={() => handleReportActionClick('lost')}
-              className="flex-1 py-3.5 px-6 bg-white border border-borderMain hover:border-rose-300 text-rose-600 font-sans text-xs font-bold rounded-2xl transition-all hover:scale-[1.02] active:scale-[0.98] shadow-sm flex items-center justify-center gap-2"
+              className="w-full py-3.5 px-6 bg-white border border-borderMain hover:border-rose-300 text-rose-600 font-sans text-xs font-bold rounded-2xl transition-all hover:scale-[1.02] active:scale-[0.98] shadow-sm flex items-center justify-center gap-2"
             >
-              <span className="w-2 h-2 rounded-full bg-rose-500 shrink-0" />
+              <span className="w-2 h-2 rounded-full bg-rose-500 shrink-0 animate-pulse" />
               Report Lost Item
-            </button>
-            <button
-              onClick={() => handleReportActionClick('found')}
-              className="flex-1 py-3.5 px-6 bg-white border border-borderMain hover:border-emerald-300 text-emerald-600 font-sans text-xs font-bold rounded-2xl transition-all hover:scale-[1.02] active:scale-[0.98] shadow-sm flex items-center justify-center gap-2"
-            >
-              <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
-              Report Found Item
             </button>
           </div>
         </div>

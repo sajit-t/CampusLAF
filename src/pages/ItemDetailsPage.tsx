@@ -252,8 +252,14 @@ export const ItemDetailsPage: React.FC = () => {
 
   const getTimelineStatus = () => {
     switch (item.status) {
-      case 'Waiting for Owner': return 'reported';
-      case 'Claim Requested': return 'claiming';
+      case 'Waiting for Owner': {
+        const hasApprovedClaim = claims.some(c => c.item_id === item.id && c.approval_status === 'approved');
+        return hasApprovedClaim ? 'verified' : 'reported';
+      }
+      case 'Claim Requested': {
+        const hasApprovedClaim = claims.some(c => c.item_id === item.id && c.approval_status === 'approved');
+        return hasApprovedClaim ? 'verified' : 'claiming';
+      }
       case 'Claimed & Collected': return 'returned';
       default: return 'reported';
     }
@@ -862,10 +868,10 @@ export const ItemDetailsPage: React.FC = () => {
                       className="w-full px-3 py-2 text-xs bg-bgMain border border-borderMain rounded-xl focus:outline-none"
                       required
                     >
-                      <option value="Waiting for Owner">Waiting for Owner</option>
-                      <option value="Claim Requested">Claim Requested</option>
-                      <option value="Claimed & Collected">Claimed & Collected</option>
-                      <option value="Archived">Archived</option>
+                      <option value="Waiting for Owner">Found (Available)</option>
+                      <option value="Claim Requested">Claim Pending / Approved</option>
+                      <option value="Claimed & Collected">Collected</option>
+                      <option value="Archived">Expired</option>
                     </select>
                   </div>
                 </div>

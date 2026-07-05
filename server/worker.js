@@ -12,17 +12,18 @@ async function runLifecycleChecks() {
   const now = new Date();
 
   try {
-    // 1. Process Expired Claims (deadline exceeded)
-    const activeClaims = await db.claims.getAll({ status: 'pending' });
+    // 1. Process Expired Claims (deadline exceeded for approved claims awaiting collection)
+    const activeClaims = await db.claims.getAll({ status: 'approved' });
     let expiredCount = 0;
 
     for (const claim of activeClaims) {
+      if (claim.claimed_date) continue; // Skip collected claims
       const deadline = new Date(claim.expected_collection_deadline);
       if (deadline < now) {
         // Claim expired! Update claim status
         await db.claims.update(claim.id, {
           approval_status: 'expired',
-          remarks: `System: Claim expired automatically because student did not visit within 2 working days (Deadline: ${deadline.toLocaleString()}).`
+          remarks: `System: Claim expired automatically because student did not visit within 2 working days of approval (Deadline: ${deadline.toLocaleString()}).`
         });
 
         // Revert item status to 'Waiting for Owner'

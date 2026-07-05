@@ -42,23 +42,23 @@ const profilePics = [
 async function seed() {
   console.log('Starting Clean Seeding Process...');
 
-  // 1. Create Default Sajit Student
-  const sajitRoll = '984512';
-  let studentSajit = await db.students.findByRoll(sajitRoll);
-  if (!studentSajit) {
-    studentSajit = await db.students.create({
-      roll_number: sajitRoll,
+  // 1. Create Default Student
+  const studentRoll = '984512';
+  let studentRecord = await db.students.findByRoll(studentRoll);
+  if (!studentRecord) {
+    studentRecord = await db.students.create({
+      roll_number: studentRoll,
       register_number: '20260984512',
-      full_name: 'Sajit Kumar',
+      full_name: 'Student',
       department: 'Computer Science',
       year: 'III Year',
       section: 'A',
-      college_email: 'sajit@campus.edu',
+      college_email: 'student@campus.edu',
       phone_number: '9876543210',
       profile_photo: profilePics[0],
       active_status: true
     });
-    console.log('Created Student: Sajit Kumar');
+    console.log('Created Student: Student');
   }
 
   // 2. Create Default Sarah student for matching
@@ -102,8 +102,8 @@ async function seed() {
   // 4. Generate 600 realistic students
   console.log('Generating 600 dummy students...');
   let seededCount = 0;
-  const emailsSet = new Set(['sajit@campus.edu', 'schen@campus.edu', 'mmiller@campus.edu']);
-  const rollsSet = new Set([sajitRoll, sarahRoll, marcusRoll]);
+  const emailsSet = new Set(['student@campus.edu', 'schen@campus.edu', 'mmiller@campus.edu']);
+  const rollsSet = new Set([studentRoll, sarahRoll, marcusRoll]);
   const registersSet = new Set(['20260984512', '20260887213', '20260445123']);
 
   for (let i = 1; i <= 600; i++) {

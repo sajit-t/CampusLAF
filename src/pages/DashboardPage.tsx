@@ -6,19 +6,20 @@ import { predefinedLocations } from './AdminDashboardPage';
 import { ImageUpload } from '../components/ImageUpload';
 import {
   LayoutDashboard,
-  Search,
-  Settings,
   Bookmark,
-  User,
-  FileCheck,
-  MapPin,
-  Sparkles,
-  Phone,
-  Mail,
-  Camera,
   PlusCircle,
+  FileCheck,
+  User,
+  Settings,
+  Search,
+  Mail,
+  Phone,
+  MapPin,
   Loader2,
-  CheckCircle2
+  Sparkles,
+  CheckCircle2,
+  FileText,
+  Camera
 } from 'lucide-react';
 
 export const DashboardPage: React.FC = () => {
@@ -34,15 +35,12 @@ export const DashboardPage: React.FC = () => {
     logout,
     studentActiveTab: activeTab,
     setStudentActiveTab: setActiveTab,
-    reportType,
-    setReportType,
     registerItem
   } = useApp();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('All');
   const [locationFilter, setLocationFilter] = useState('All');
-  const [typeFilter, setTypeFilter] = useState<'All' | 'lost' | 'found'>('All');
   const [sortBy, setSortBy] = useState<'newest' | 'oldest' | 'name'>('newest');
 
   // Student Report form states
@@ -59,7 +57,7 @@ export const DashboardPage: React.FC = () => {
   const [studentSuccessMsg, setStudentSuccessMsg] = useState(false);
 
   const filteredCatalogItems = items.filter(item => {
-    const typeMatch = typeFilter === 'All' || item.type === typeFilter;
+    if (item.type !== 'found') return false; // ONLY FOUND ITEMS in catalog
     const categoryMatch = categoryFilter === 'All' || item.category === categoryFilter;
     let locationMatch = false;
     if (locationFilter === 'All') {
@@ -69,7 +67,7 @@ export const DashboardPage: React.FC = () => {
     } else {
       locationMatch = item.found_location === locationFilter;
     }
-    return typeMatch && categoryMatch && locationMatch;
+    return categoryMatch && locationMatch;
   });
 
   const sortedCatalogItems = [...filteredCatalogItems].sort((a, b) => {
@@ -129,7 +127,7 @@ export const DashboardPage: React.FC = () => {
         found_location: repLocation,
         found_date: repDate,
         notes: repNotes,
-        type: reportType
+        type: 'lost' as const
       };
       
       const success = await registerItem(payload, repFiles);
@@ -195,21 +193,22 @@ export const DashboardPage: React.FC = () => {
   };
 
   const myClaimsCount = claims.length;
-  const waitingItems = items.filter(i => i.status === 'Waiting for Owner');
-  const claimRequestedItems = items.filter(i => i.status === 'Claim Requested');
-  const claimedItems = items.filter(i => i.status === 'Claimed & Collected');
 
   interface MenuItem {
-    id: 'dashboard' | 'lost' | 'claims' | 'report' | 'profile' | 'settings';
+    id: 'dashboard' | 'lost' | 'lost-reports' | 'claims' | 'report' | 'profile' | 'settings';
     label: string;
     icon: any;
     badge?: number;
   }
 
+  const myLostReportsCount = items.filter(i => i.type === 'lost').length;
+  const availableFoundCount = items.filter(i => i.type === 'found' && i.status === 'Waiting for Owner').length;
+
   const menuItems: MenuItem[] = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'lost', label: 'Browse Catalog', icon: Bookmark, badge: waitingItems.length + claimRequestedItems.length },
-    { id: 'report', label: 'Report Lost / Found', icon: PlusCircle },
+    { id: 'lost', label: 'Browse Found Items', icon: Bookmark, badge: availableFoundCount > 0 ? availableFoundCount : undefined },
+    { id: 'lost-reports', label: 'My Lost Reports', icon: FileText, badge: myLostReportsCount > 0 ? myLostReportsCount : undefined },
+    { id: 'report', label: 'Report Lost Item', icon: PlusCircle },
     { id: 'claims', label: 'My Claims History', icon: FileCheck, badge: myClaimsCount > 0 ? myClaimsCount : undefined },
     { id: 'profile', label: 'My Profile', icon: User },
     { id: 'settings', label: 'Portal Configs', icon: Settings },
@@ -290,7 +289,7 @@ export const DashboardPage: React.FC = () => {
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-8">
           <div className="text-left">
             <h2 className="text-2xl md:text-3xl font-sans font-extrabold text-textMain tracking-tight">
-              Good Morning, {activeStudent?.full_name || currentUser?.name || 'Sajit'} 👋
+              Good Morning, {activeStudent?.full_name || currentUser?.name || 'Student'} 👋
             </h2>
             <p className="text-xs text-textMuted mt-1 font-medium">
               Browse lost reports, claim items, or track status of your verification queues.
@@ -312,6 +311,22 @@ export const DashboardPage: React.FC = () => {
           </div>
         </div>
 
+        {/* Mobile Tab Selector */}
+        <div className="block md:hidden mb-6 text-left">
+          <label className="text-[10px] font-bold text-textMuted uppercase tracking-wider block mb-2">Navigate Portal</label>
+          <select
+            value={activeTab}
+            onChange={(e) => setActiveTab(e.target.value as any)}
+            className="w-full px-3 py-2.5 text-xs bg-white border border-borderMain rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 shadow-sm"
+          >
+            {menuItems.map(item => (
+              <option key={item.id} value={item.id}>
+                {item.label} {item.badge !== undefined && item.badge > 0 ? `(${item.badge})` : ''}
+              </option>
+            ))}
+          </select>
+        </div>
+
         {/* Dynamic sub-view switching */}
         <AnimatePresence mode="wait">
           {activeTab === 'dashboard' && (
@@ -325,10 +340,10 @@ export const DashboardPage: React.FC = () => {
               {/* Statistics Grid */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
                 {[
-                  { label: 'Lost Items logged', val: waitingItems.length + claimRequestedItems.length, border: 'border-l-primary' },
-                  { label: 'Claim Requested', val: claimRequestedItems.length, border: 'border-l-yellow-400' },
-                  { label: 'Claimed & Collected', val: claimedItems.length, border: 'border-l-emerald-500' },
+                  { label: 'My Lost Reports', val: myLostReportsCount, border: 'border-l-rose-500' },
+                  { label: 'Available Found Items', val: availableFoundCount, border: 'border-l-primary' },
                   { label: 'My Claims History', val: myClaimsCount, border: 'border-l-indigo-500' },
+                  { label: 'My Collected Items', val: claims.filter(c => c.approval_status === 'approved' && c.claimed_date).length, border: 'border-l-emerald-500' },
                 ].map(stat => (
                   <div key={stat.label} className={`bg-white p-4 md:p-5 rounded-2xl border border-borderMain/60 shadow-soft border-l-4 ${stat.border} text-left`}>
                     <p className="text-[10px] text-textMuted uppercase font-bold tracking-wider">{stat.label}</p>
@@ -342,12 +357,12 @@ export const DashboardPage: React.FC = () => {
                 {/* Left Column: Recent Items */}
                 <div className="lg:col-span-8 space-y-6 text-left">
                   <div className="flex justify-between items-center">
-                    <h3 className="font-sans font-bold text-base text-textMain">Active Lost Items in Office</h3>
+                    <h3 className="font-sans font-bold text-base text-textMain">Available Found Items in Office</h3>
                     <button onClick={() => setActiveTab('lost')} className="text-xs text-primary font-bold hover:underline">View All</button>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {items.slice(0, 4).map(item => (
+                    {items.filter(item => item.type === 'found' && item.status === 'Waiting for Owner').slice(0, 4).map(item => (
                       <div
                         key={item.id}
                         onClick={() => handleItemClick(item.id)}
@@ -443,7 +458,7 @@ export const DashboardPage: React.FC = () => {
               </div>
 
               {/* Filtering Controls */}
-              <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 bg-white border border-borderMain p-4 rounded-2xl shadow-soft text-left w-full">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 bg-white border border-borderMain p-4 rounded-2xl shadow-soft text-left w-full">
                 {/* Category */}
                 <div className="space-y-1">
                   <label className="text-[9px] font-bold text-textMuted uppercase tracking-wider">Category</label>
@@ -477,20 +492,6 @@ export const DashboardPage: React.FC = () => {
                   </select>
                 </div>
 
-                {/* Type Filter (Lost vs Found) */}
-                <div className="space-y-1">
-                  <label className="text-[9px] font-bold text-textMuted uppercase tracking-wider">Report Type</label>
-                  <select
-                    value={typeFilter}
-                    onChange={(e) => setTypeFilter(e.target.value as any)}
-                    className="w-full px-3 py-2 text-xs bg-bgMain border border-borderMain rounded-xl focus:outline-none focus:ring-1 focus:ring-primary"
-                  >
-                    <option value="All">All Reports</option>
-                    <option value="lost">Lost Reports</option>
-                    <option value="found">Found Reports</option>
-                  </select>
-                </div>
-
                 {/* Sort By */}
                 <div className="space-y-1">
                   <label className="text-[9px] font-bold text-textMuted uppercase tracking-wider">Sort By</label>
@@ -508,7 +509,7 @@ export const DashboardPage: React.FC = () => {
 
               {sortedCatalogItems.length === 0 ? (
                 <div className="py-20 bg-white border border-borderMain/60 rounded-2xl text-center text-xs text-textMuted w-full">
-                  No lost or found items match the search criteria.
+                  No found items match the search criteria.
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -522,30 +523,13 @@ export const DashboardPage: React.FC = () => {
                         <img src={item.images && item.images.length > 0 ? item.images[0] : '/uploads/placeholder.jpg'} alt={item.item_name} className="w-full h-full object-cover" />
                         
                         {/* Type Indicator top left */}
-                        <span className={`absolute top-3 left-3 text-[9px] font-extrabold px-2.5 py-0.5 rounded-full border shadow-sm ${
-                          item.type === 'lost'
-                            ? 'bg-rose-50 border-rose-100 text-rose-600'
-                            : 'bg-emerald-50 border-emerald-100 text-emerald-600'
-                        }`}>
-                          {item.type?.toUpperCase()}
+                        <span className="absolute top-3 left-3 text-[9px] font-extrabold px-2.5 py-0.5 rounded-full border shadow-sm bg-emerald-50 border-emerald-100 text-emerald-600">
+                          FOUND
                         </span>
 
-                        <span className={`absolute top-3 right-3 text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                          item.status === 'Claimed & Collected'
-                            ? 'bg-emerald-100 text-emerald-600'
-                            : item.status === 'Claim Requested'
-                              ? 'bg-amber-100 text-amber-600'
-                              : 'bg-primary-light text-primary'
-                        }`}>
-                          {item.status === 'Claimed & Collected' ? getClaimedBadge(item) : item.status.toUpperCase()}
+                        <span className="absolute top-3 right-3 text-[10px] font-bold px-2 py-0.5 rounded-full bg-primary-light text-primary">
+                          AVAILABLE
                         </span>
-
-                        {item.matchScore && (
-                          <span className="absolute bottom-3 left-3 text-[10px] font-extrabold bg-indigo-600 text-white px-2.5 py-0.5 rounded-full flex items-center gap-1 shadow">
-                            <Sparkles size={10} />
-                            {item.matchScore}% Match
-                          </span>
-                        )}
                       </div>
                       <div className="p-4 space-y-2">
                         <span className="text-[9px] font-sans font-bold text-accent uppercase tracking-wider">{item.category}</span>
@@ -558,6 +542,58 @@ export const DashboardPage: React.FC = () => {
                       </div>
                     </div>
                   ))}
+                </div>
+              )}
+            </motion.div>
+          )}
+
+          {activeTab === 'lost-reports' && (
+            <motion.div
+              key="lost-reports-tab"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="space-y-6 text-left"
+            >
+              <div className="flex justify-between items-center">
+                <h3 className="font-sans font-bold text-lg text-textMain">My Lost Reports</h3>
+                <span className="text-xs text-textMuted">{myLostReportsCount} reports logged</span>
+              </div>
+
+              {myLostReportsCount === 0 ? (
+                <div className="py-20 bg-white border border-borderMain/60 rounded-2xl text-center text-xs text-textMuted w-full">
+                  You have not reported any lost items yet.
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  {items
+                    .filter(item => item.type === 'lost')
+                    .map(item => (
+                      <div
+                        key={item.id}
+                        onClick={() => handleItemClick(item.id)}
+                        className="bg-white border border-borderMain rounded-2xl overflow-hidden shadow-soft hover:shadow-hover hover:-translate-y-1 transition-all cursor-pointer flex flex-col justify-between"
+                      >
+                        <div className="relative h-44 bg-borderMain/10">
+                          <img src={item.images && item.images.length > 0 ? item.images[0] : '/uploads/placeholder.jpg'} alt={item.item_name} className="w-full h-full object-cover" />
+                          <span className="absolute top-3 left-3 text-[9px] font-extrabold px-2.5 py-0.5 rounded-full border shadow-sm bg-rose-50 border-rose-100 text-rose-600">
+                            REPORTED LOST
+                          </span>
+                          <span className="absolute top-3 right-3 text-[10px] font-bold px-2 py-0.5 rounded-full bg-primary-light text-primary">
+                            {item.status === 'Waiting for Owner' ? 'OPEN' : item.status.toUpperCase()}
+                          </span>
+                        </div>
+                        <div className="p-4 space-y-2">
+                          <span className="text-[9px] font-sans font-bold text-accent uppercase tracking-wider">{item.category}</span>
+                          <h4 className="font-sans font-bold text-sm text-textMain truncate leading-tight">{item.item_name}</h4>
+                          <p className="text-[11px] text-textMuted line-clamp-2 leading-relaxed min-h-[32px]">{item.description}</p>
+                          <div className="flex justify-between items-center text-[10px] text-textMuted pt-2 border-t border-borderMain/50">
+                            <span className="flex items-center gap-1"><MapPin size={10} /> Location: {item.found_location}</span>
+                            <span>{item.found_date}</span>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
                 </div>
               )}
             </motion.div>
@@ -633,7 +669,7 @@ export const DashboardPage: React.FC = () => {
               exit={{ opacity: 0 }}
               className="space-y-6 text-left max-w-3xl"
             >
-              <h3 className="font-sans font-bold text-lg text-textMain">Report Lost or Found Item</h3>
+              <h3 className="font-sans font-bold text-lg text-textMain">Report Lost Item</h3>
               
               {studentSuccessMsg ? (
                 <div className="p-6 bg-white border border-borderMain rounded-3xl text-center space-y-4 shadow-soft">
@@ -659,34 +695,6 @@ export const DashboardPage: React.FC = () => {
               ) : (
                 <form onSubmit={handleStudentReportSubmit} className="space-y-6 bg-white border border-borderMain rounded-3xl p-6 md:p-8 shadow-soft">
                   <div className="space-y-4">
-                    {/* Report Type selector */}
-                    <div className="space-y-1.5">
-                      <label className="text-[10px] font-bold text-textMain uppercase tracking-wider block">Report Type *</label>
-                      <div className="grid grid-cols-2 gap-3">
-                        <button
-                          type="button"
-                          onClick={() => setReportType('lost')}
-                          className={`py-3 px-4 text-xs font-bold rounded-xl border transition-all ${
-                            reportType === 'lost'
-                              ? 'bg-primary-light/10 border-primary text-primary shadow-sm'
-                              : 'bg-bgMain border-borderMain hover:bg-white text-textMuted'
-                          }`}
-                        >
-                          I lost this item
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setReportType('found')}
-                          className={`py-3 px-4 text-xs font-bold rounded-xl border transition-all ${
-                            reportType === 'found'
-                              ? 'bg-primary-light/10 border-primary text-primary shadow-sm'
-                              : 'bg-bgMain border-borderMain hover:bg-white text-textMuted'
-                          }`}
-                        >
-                          I found this item
-                        </button>
-                      </div>
-                    </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       {/* Item Name */}
@@ -749,7 +757,7 @@ export const DashboardPage: React.FC = () => {
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       {/* Date */}
                       <div className="space-y-1">
-                        <label className="text-[10px] font-bold text-textMain uppercase tracking-wider block">Date Lost/Found *</label>
+                        <label className="text-[10px] font-bold text-textMain uppercase tracking-wider block">Date Lost *</label>
                         <input
                           type="date"
                           value={repDate}
@@ -761,7 +769,7 @@ export const DashboardPage: React.FC = () => {
 
                       {/* Location */}
                       <div className="space-y-1">
-                        <label className="text-[10px] font-bold text-textMain uppercase tracking-wider block">Campus Location *</label>
+                        <label className="text-[10px] font-bold text-textMain uppercase tracking-wider block">Location Lost *</label>
                         <select
                           value={repLocation}
                           onChange={(e) => setRepLocation(e.target.value)}

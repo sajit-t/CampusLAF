@@ -55,7 +55,7 @@ export const FloatingObjects: React.FC = () => {
         style={{ x: laptopX, y: laptopY }}
         animate={{ y: [0, -12, 0], rotate: [0, 1, 0] }}
         transition={{ duration: 7, repeat: Infinity, ease: 'easeInOut' }}
-        className="absolute w-[240px] md:w-[320px] left-[10%] top-[25%] z-10"
+        className="absolute w-[240px] md:w-[320px] left-[2%] md:left-[24%] top-[30%] md:top-[28%] z-10"
       >
         <svg viewBox="0 0 320 200" fill="none" xmlns="http://www.w3.org/2000/svg" className="filter drop-shadow-xl">
           {/* Laptop Base Shadow */}
@@ -95,7 +95,7 @@ export const FloatingObjects: React.FC = () => {
         style={{ x: idCardX, y: idCardY }}
         animate={{ y: [0, -18, 0], rotate: [0, -3, 0] }}
         transition={{ duration: 5.5, repeat: Infinity, ease: 'easeInOut', delay: 0.5 }}
-        className="absolute w-[160px] md:w-[210px] right-[12%] top-[12%] z-30"
+        className="absolute w-[160px] md:w-[210px] left-[5%] md:left-auto md:right-[5%] top-[2%] md:top-[6%] z-30"
       >
         <svg viewBox="0 0 210 130" fill="none" xmlns="http://www.w3.org/2000/svg" className="filter drop-shadow-xl">
           {/* ID Card Shadow */}
@@ -117,7 +117,7 @@ export const FloatingObjects: React.FC = () => {
           <path d="M24 82 C24 72 30 70 39 70 C48 70 54 72 54 82 Z" fill="#AD56C4" fillOpacity="0.4" />
           {/* Card Info Details */}
           <text x="75" y="52" fill="#1E1E1E" fontSize="11" fontWeight="bold" fontFamily="sans-serif">
-            Sajit Kumar
+            Student
           </text>
           <text x="75" y="66" fill="#6B7280" fontSize="8" fontFamily="sans-serif">
             Student ID
@@ -154,7 +154,7 @@ export const FloatingObjects: React.FC = () => {
         style={{ x: bottleX, y: bottleY }}
         animate={{ y: [0, -14, 0], rotate: [0, -2, 0] }}
         transition={{ duration: 6.5, repeat: Infinity, ease: 'easeInOut', delay: 1 }}
-        className="absolute w-[90px] md:w-[120px] left-[5%] bottom-[12%] z-20"
+        className="absolute w-[90px] md:w-[120px] right-[2%] md:right-auto md:left-[4%] top-[4%] md:top-[12%] z-20"
       >
         <svg viewBox="0 0 120 260" fill="none" xmlns="http://www.w3.org/2000/svg" className="filter drop-shadow-lg">
           {/* Flask Shadow */}
@@ -182,7 +182,7 @@ export const FloatingObjects: React.FC = () => {
         style={{ x: headphonesX, y: headphonesY }}
         animate={{ y: [0, -10, 0], rotate: [0, 4, 0] }}
         transition={{ duration: 8, repeat: Infinity, ease: 'easeInOut', delay: 1.5 }}
-        className="absolute w-[160px] md:w-[200px] right-[8%] bottom-[20%] z-10"
+        className="absolute w-[160px] md:w-[200px] right-[2%] md:right-[3%] bottom-[2%] md:bottom-[8%] z-10"
       >
         <svg viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg" className="filter drop-shadow-xl">
           {/* Headband */}
@@ -207,7 +207,7 @@ export const FloatingObjects: React.FC = () => {
         style={{ x: walletX, y: walletY }}
         animate={{ y: [0, -15, 0], rotate: [0, 3, 0] }}
         transition={{ duration: 6, repeat: Infinity, ease: 'easeInOut', delay: 0.2 }}
-        className="absolute w-[120px] md:w-[150px] left-[32%] bottom-[8%] z-30"
+        className="absolute w-[120px] md:w-[150px] left-[2%] md:left-[6%] bottom-[4%] md:bottom-[8%] z-30"
       >
         <svg viewBox="0 0 150 110" fill="none" xmlns="http://www.w3.org/2000/svg" className="filter drop-shadow-md">
           {/* Shadow */}
@@ -230,7 +230,7 @@ export const FloatingObjects: React.FC = () => {
         style={{ x: keysX, y: keysY }}
         animate={{ y: [0, -17, 0], rotate: [0, -5, 0] }}
         transition={{ duration: 5, repeat: Infinity, ease: 'easeInOut', delay: 0.8 }}
-        className="absolute w-[120px] md:w-[155px] right-[30%] top-[40%] z-20"
+        className="absolute w-[120px] md:w-[155px] left-[35%] md:left-[38%] bottom-[2%] md:bottom-[6%] z-20"
       >
         <svg viewBox="0 0 160 160" fill="none" xmlns="http://www.w3.org/2000/svg" className="filter drop-shadow-lg">
           {/* Red Lanyard Fabric */}

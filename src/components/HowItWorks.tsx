@@ -4,29 +4,29 @@ import { ClipboardCheck, SearchCode, ShieldAlert, BadgeCheck } from 'lucide-reac
 export const HowItWorks: React.FC = () => {
   const steps = [
     {
-      title: 'Report an Item',
-      desc: 'Report a lost or found item in under a minute. Add photos, location, category, and details to help identify it.',
+      title: 'Report Lost Item',
+      desc: 'Students quickly log items they have lost on campus. Add photo attachments, color tags, and location references.',
       icon: ClipboardCheck,
       color: 'bg-primary-light/50 text-primary border-primary/20',
       badge: 'Step 1'
     },
     {
-      title: 'Smart Matching',
-      desc: 'Our system compares reports using item details, categories, locations, and images to identify possible matches.',
+      title: 'Office Inventory Logging',
+      desc: 'Safety officers receive turned-in found items physically, log storage shelf locations, and publish them to the catalog.',
       icon: SearchCode,
       color: 'bg-accent-light/50 text-accent border-accent/20',
       badge: 'Step 2'
     },
     {
-      title: 'Verification',
-      desc: "Office staff verify ownership using the student's ID card barcode or roll number before releasing the item.",
+      title: 'Claim Ownership',
+      desc: 'Students browse the available catalog, select their item, submit verification answers, and trigger validation checks.',
       icon: ShieldAlert,
       color: 'bg-emerald-50 text-emerald-600 border-emerald-100',
       badge: 'Step 3'
     },
     {
-      title: 'Collect Your Item',
-      desc: 'Once verified, collect your belongings from the campus lost and found office.',
+      title: 'Verification & Collection',
+      desc: 'Visit the office, scan student barcode, confirm answers, sign receipt code, and check out your recovered property.',
       icon: BadgeCheck,
       color: 'bg-indigo-50 text-indigo-600 border-indigo-100',
       badge: 'Step 4'

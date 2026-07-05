@@ -137,7 +137,7 @@ export const Navbar: React.FC = () => {
     },
     { 
       id: 'report', 
-      label: 'Report Item', 
+      label: (currentUser && ['admin', 'super_admin'].includes(currentUser.role)) ? 'Receive Found Item' : 'Report Lost Item', 
       icon: FileText, 
       isActive: currentPage === 'admin' && adminActiveTab === 'receive', 
       action: () => {

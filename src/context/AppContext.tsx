@@ -131,6 +131,7 @@ interface AppContextType {
   approveClaim: (claimId: string, notes: string) => Promise<boolean>;
   rejectClaim: (claimId: string, remarks: string) => Promise<boolean>;
   cancelClaim: (claimId: string) => Promise<boolean>;
+  collectClaim: (claimId: string) => Promise<boolean>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -521,6 +522,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
+  const collectClaim = async (claimId: string): Promise<boolean> => {
+    setErrorMsg(null);
+    try {
+      await apiRequest(`/api/claims/${claimId}/collect`, 'PUT');
+      fetchItems();
+      fetchClaims();
+      fetchAnalytics();
+      return true;
+    } catch (err: any) {
+      setErrorMsg(err.message);
+      return false;
+    }
+  };
+
   return (
     <AppContext.Provider value={{
       token,
@@ -566,7 +581,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       submitClaim,
       approveClaim,
       rejectClaim,
-      cancelClaim
+      cancelClaim,
+      collectClaim
     }}>
       {children}
     </AppContext.Provider>
