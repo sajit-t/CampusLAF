@@ -19,10 +19,13 @@ const PORT = process.env.PORT || 5000;
 app.use(cors());
 app.use(express.json());
 
-// Serve static uploads
 const uploadPath = path.resolve('./server/uploads');
-if (!fs.existsSync(uploadPath)) {
-  fs.mkdirSync(uploadPath, { recursive: true });
+try {
+  if (!fs.existsSync(uploadPath)) {
+    fs.mkdirSync(uploadPath, { recursive: true });
+  }
+} catch (err) {
+  console.warn('Unable to create uploads directory (could be read-only filesystem):', err.message);
 }
 app.use('/uploads', express.static(uploadPath));
 
