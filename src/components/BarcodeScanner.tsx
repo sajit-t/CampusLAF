@@ -428,44 +428,31 @@ export const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onScanSuccess, o
             />
           )}
 
-          {/* HOLE-PUNCH DOCUMENT SCANNER MASK LAYER */}
+          {/* CENTERING VIEWPORT WITH DOCUMENT MASK OVERLAY */}
           {isScanning && (
-            <div className="absolute inset-0 flex flex-col pointer-events-none z-20">
-              {/* Top Dark Block */}
-              <div className="flex-1 bg-black/60 w-full" />
-              
-              {/* Center Row Viewport Block - dynamically calculated based on aspect ratio */}
-              <div className="flex w-full items-stretch shrink-0">
-                <div className="flex-1 bg-black/60" />
-                
-                {/* Viewport Card Frame (aspect-ratio 1.58:1) */}
-                <div className={`aspect-[1.58] w-[82%] max-w-[320px] border-2 rounded-2xl relative flex flex-col items-center justify-center text-center transition-all duration-300 shrink-0 ${
-                  scanSuccess 
-                    ? 'border-emerald-500 shadow-[0_0_25px_rgba(16,185,129,0.5)] bg-emerald-500/10' 
-                    : 'border-white/70 shadow-[0_0_15px_rgba(255,255,255,0.15)] bg-transparent'
-                }`}>
-                  {/* Four Corner Guides */}
-                  <div className={`absolute -top-[2px] -left-[2px] w-6 h-6 border-t-4 border-l-4 rounded-tl-xl transition-colors duration-300 ${scanSuccess ? 'border-emerald-500' : 'border-primary'}`} />
-                  <div className={`absolute -top-[2px] -right-[2px] w-6 h-6 border-t-4 border-r-4 rounded-tr-xl transition-colors duration-300 ${scanSuccess ? 'border-emerald-500' : 'border-primary'}`} />
-                  <div className={`absolute -bottom-[2px] -left-[2px] w-6 h-6 border-b-4 border-l-4 rounded-bl-xl transition-colors duration-300 ${scanSuccess ? 'border-emerald-500' : 'border-primary'}`} />
-                  <div className={`absolute -bottom-[2px] -right-[2px] w-6 h-6 border-b-4 border-r-4 rounded-br-xl transition-colors duration-300 ${scanSuccess ? 'border-emerald-500' : 'border-primary'}`} />
+            <div className="absolute inset-0 pointer-events-none z-20 flex items-center justify-center overflow-hidden">
+              {/* Viewport Card Frame with 9999px spread shadow to darken outer area */}
+              <div className={`aspect-[1.58] w-[80%] max-w-[320px] border-2 rounded-2xl relative flex flex-col items-center justify-center text-center transition-all duration-300 shadow-[0_0_0_9999px_rgba(10,10,10,0.65)] ${
+                scanSuccess 
+                  ? 'border-emerald-500 shadow-[0_0_25px_rgba(16,185,129,0.4)] bg-emerald-500/10' 
+                  : 'border-white/70 bg-transparent'
+              }`}>
+                {/* Four corner guides */}
+                <div className={`absolute -top-[2px] -left-[2px] w-6 h-6 border-t-4 border-l-4 rounded-tl-xl transition-colors duration-300 ${scanSuccess ? 'border-emerald-500' : 'border-primary'}`} />
+                <div className={`absolute -top-[2px] -right-[2px] w-6 h-6 border-t-4 border-r-4 rounded-tr-xl transition-colors duration-300 ${scanSuccess ? 'border-emerald-500' : 'border-primary'}`} />
+                <div className={`absolute -bottom-[2px] -left-[2px] w-6 h-6 border-b-4 border-l-4 rounded-bl-xl transition-colors duration-300 ${scanSuccess ? 'border-emerald-500' : 'border-primary'}`} />
+                <div className={`absolute -bottom-[2px] -right-[2px] w-6 h-6 border-b-4 border-r-4 rounded-br-xl transition-colors duration-300 ${scanSuccess ? 'border-emerald-500' : 'border-primary'}`} />
 
-                  {/* Inner Viewport Text guides */}
-                  <div className="space-y-1.5 select-none bg-black/55 px-4 py-3 rounded-2xl border border-white/5 max-w-[260px] mx-auto shadow-md">
-                    <p className="text-[10px] font-sans font-extrabold text-white uppercase tracking-wider">
-                      Place your Student ID inside the frame
-                    </p>
-                    <p className="text-[9px] text-neutral-300 font-semibold leading-normal">
-                      The barcode will be detected automatically.
-                    </p>
-                  </div>
+                {/* Inner viewport text guidelines */}
+                <div className="space-y-1.5 select-none bg-neutral-900/90 px-4 py-3 rounded-2xl border border-white/5 max-w-[240px] mx-auto shadow-md">
+                  <p className="text-[10px] font-sans font-extrabold text-white uppercase tracking-wider leading-tight">
+                    Place your Student ID inside the frame
+                  </p>
+                  <p className="text-[9px] text-neutral-400 font-semibold leading-normal">
+                    The barcode will be detected automatically.
+                  </p>
                 </div>
-                
-                <div className="flex-1 bg-black/60" />
               </div>
-
-              {/* Bottom Dark Block */}
-              <div className="flex-1 bg-black/60 w-full" />
             </div>
           )}
 
