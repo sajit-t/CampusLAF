@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import type { Student } from '../context/AppContext';
 import { ImageUpload } from '../components/ImageUpload';
+import { BarcodeScanner } from '../components/BarcodeScanner';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Shield, Check, X, HelpCircle, FileText, Users, FileCheck, Sliders,
@@ -110,6 +111,13 @@ export const AdminDashboardPage: React.FC = () => {
   const [receiveFiles, setReceiveFiles] = useState<File[]>([]);
 
   const [showBarcodeModal, setShowBarcodeModal] = useState(false);
+  const [scannerContext, setScannerContext] = useState<'register' | 'claim_verify' | null>(null);
+  const [activeClaimIdForScanner, setActiveClaimIdForScanner] = useState<string>('');
+  
+  // Verification states per claim ID
+  const [verifyRollInputs, setVerifyRollInputs] = useState<Record<string, string>>({});
+  const [verifiedStudents, setVerifiedStudents] = useState<Record<string, Student>>({});
+  const [verifyMessages, setVerifyMessages] = useState<Record<string, string>>({});
 
   // Claims process notes
   const [verificationNotes, setVerificationNotes] = useState<Record<string, string>>({});
@@ -160,18 +168,56 @@ export const AdminDashboardPage: React.FC = () => {
     }
   };
 
-  // Barcode simulate scan shortcut
-  const handleBarcodeSimulate = async (code: string) => {
-    setReceiveRoll(code);
+  const handleBarcodeScanSuccess = async (code: string) => {
     setShowBarcodeModal(false);
-    setLookupMessage('Scanning barcode...');
-    const student = await fetchStudentByRoll(code);
+    if (scannerContext === 'register') {
+      setReceiveRoll(code);
+      setLookupMessage('Searching student database...');
+      const student = await fetchStudentByRoll(code);
+      if (student) {
+        setFoundStudent(student);
+        setLookupMessage('');
+      } else {
+        setFoundStudent(null);
+        setLookupMessage('Student Roll Number not found.');
+      }
+    } else if (scannerContext === 'claim_verify') {
+      setVerifyRollInputs(prev => ({ ...prev, [activeClaimIdForScanner]: code }));
+      setVerifyMessages(prev => ({ ...prev, [activeClaimIdForScanner]: 'Searching student database...' }));
+      const student = await fetchStudentByRoll(code);
+      if (student) {
+        setVerifiedStudents(prev => ({ ...prev, [activeClaimIdForScanner]: student }));
+        setVerifyMessages(prev => ({ ...prev, [activeClaimIdForScanner]: '' }));
+      } else {
+        setVerifiedStudents(prev => {
+          const next = { ...prev };
+          delete next[activeClaimIdForScanner];
+          return next;
+        });
+        setVerifyMessages(prev => ({ ...prev, [activeClaimIdForScanner]: 'Student Roll Number not found.' }));
+      }
+    }
+    setScannerContext(null);
+  };
+
+  const handleVerifyLookup = async (claimId: string) => {
+    const roll = verifyRollInputs[claimId] || '';
+    if (!roll.trim()) {
+      setVerifyMessages(prev => ({ ...prev, [claimId]: 'Please enter a roll number.' }));
+      return;
+    }
+    setVerifyMessages(prev => ({ ...prev, [claimId]: 'Searching database...' }));
+    const student = await fetchStudentByRoll(roll.trim());
     if (student) {
-      setFoundStudent(student);
-      setLookupMessage('');
+      setVerifiedStudents(prev => ({ ...prev, [claimId]: student }));
+      setVerifyMessages(prev => ({ ...prev, [claimId]: '' }));
     } else {
-      setFoundStudent(null);
-      setLookupMessage('Student Roll Number not found.');
+      setVerifiedStudents(prev => {
+        const next = { ...prev };
+        delete next[claimId];
+        return next;
+      });
+      setVerifyMessages(prev => ({ ...prev, [claimId]: 'Student Roll Number not found.' }));
     }
   };
 
@@ -654,7 +700,10 @@ export const AdminDashboardPage: React.FC = () => {
                     </label>
                     <button
                       type="button"
-                      onClick={() => setShowBarcodeModal(true)}
+                      onClick={() => {
+                        setScannerContext('register');
+                        setShowBarcodeModal(true);
+                      }}
                       className="text-[10px] px-2.5 py-1 bg-primary-light hover:bg-primary text-primary hover:text-white rounded-lg transition-colors flex items-center gap-1 font-bold shadow-sm"
                     >
                       <Scan size={10} /> Scan Barcode ID
@@ -953,9 +1002,8 @@ export const AdminDashboardPage: React.FC = () => {
                         </div>
 
                         <div className="text-left text-xs bg-bgMain p-4 border border-borderMain rounded-xl space-y-1 shadow-sm">
-                          <span className="text-textMuted block font-bold uppercase tracking-wider text-[9px]">Claimant student</span>
-                          <span className="font-bold text-textMain block">{claim.claimant_roll_number}</span>
-                          <span className="text-[10px] text-textMuted block">Fetched automatically from student database.</span>
+                          <span className="text-textMuted block font-bold uppercase tracking-wider text-[9px]">Claimant roll number</span>
+                          <span className="font-bold text-textMain block font-mono text-xs">{claim.claimant_roll_number}</span>
                         </div>
                       </div>
 
@@ -971,6 +1019,75 @@ export const AdminDashboardPage: React.FC = () => {
                         </div>
                       </div>
 
+                      {/* Student ID card verification interface */}
+                      <div className="bg-bgMain p-4 border border-borderMain rounded-2xl space-y-3">
+                        <div className="flex justify-between items-center flex-wrap gap-2">
+                          <span className="text-textMuted font-bold uppercase tracking-wider text-[9px]">Student Claimant ID Verification</span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setActiveClaimIdForScanner(claim.id);
+                              setScannerContext('claim_verify');
+                              setShowBarcodeModal(true);
+                            }}
+                            className="text-[10px] px-2.5 py-1.5 bg-primary-light hover:bg-primary text-primary hover:text-white rounded-lg transition-colors flex items-center gap-1 font-bold shadow-sm"
+                          >
+                            <Scan size={10} /> Scan Student ID Barcode
+                          </button>
+                        </div>
+
+                        {/* Manual entry lookup as a fallback */}
+                        <div className="flex gap-2">
+                          <input
+                            type="text"
+                            placeholder="Enter Roll Number manually..."
+                            value={verifyRollInputs[claim.id] || ''}
+                            onChange={(e) => setVerifyRollInputs(prev => ({ ...prev, [claim.id]: e.target.value }))}
+                            className="flex-1 px-3 py-2 text-xs bg-white border border-borderMain rounded-xl focus:outline-none focus:ring-1 focus:ring-primary"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleVerifyLookup(claim.id)}
+                            className="px-3.5 py-2 bg-white border border-borderMain hover:border-primary text-textMain hover:text-primary text-xs font-bold rounded-xl transition-all"
+                          >
+                            Lookup
+                          </button>
+                        </div>
+
+                        {verifyMessages[claim.id] && (
+                          <p className="text-[10px] text-amber-600 font-semibold">{verifyMessages[claim.id]}</p>
+                        )}
+
+                        {/* Scanned/Entered student details block */}
+                        {verifiedStudents[claim.id] ? (
+                          <div className="space-y-3 pt-1">
+                            <div className="p-3 bg-white border border-borderMain rounded-xl space-y-1.5 text-[11px] text-textMain">
+                              <div><span className="text-textMuted font-medium">Name:</span> <strong className="font-bold">{verifiedStudents[claim.id].full_name}</strong></div>
+                              <div><span className="text-textMuted font-medium">Roll Number:</span> <strong className="font-mono">{verifiedStudents[claim.id].roll_number}</strong></div>
+                              <div><span className="text-textMuted font-medium">Department:</span> <strong>{verifiedStudents[claim.id].department}</strong> | <span className="text-textMuted font-medium">Year:</span> <strong>{verifiedStudents[claim.id].year}</strong></div>
+                              <div><span className="text-textMuted font-medium">Email:</span> <strong>{verifiedStudents[claim.id].college_email}</strong></div>
+                            </div>
+
+                            {/* Match check indicator */}
+                            {verifiedStudents[claim.id].roll_number === claim.claimant_roll_number ? (
+                              <div className="p-2.5 bg-emerald-50 border border-emerald-200 text-emerald-800 text-[10px] font-bold rounded-xl flex items-center gap-1.5">
+                                <Check size={12} className="text-emerald-600 animate-pulse" />
+                                <span>✓ MATCH: Student ID verified successfully. Matches the claimant roll number.</span>
+                              </div>
+                            ) : (
+                              <div className="p-2.5 bg-red-50 border border-red-200 text-red-800 text-[10px] font-bold rounded-xl flex items-center gap-1.5">
+                                <X size={12} className="text-red-600" />
+                                <span>⚠ MISMATCH: Scanned student Roll Number ({verifiedStudents[claim.id].roll_number}) does not match the claimant ({claim.claimant_roll_number}).</span>
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="p-2.5 bg-white border border-dashed border-borderMain rounded-xl text-center text-[10px] text-textMuted font-medium">
+                            Please scan the barcode or enter roll number manually to verify.
+                          </div>
+                        )}
+                      </div>
+
                       {/* Verification notes input */}
                       <div className="space-y-2 text-xs">
                         <label className="font-bold text-textMain uppercase tracking-wider text-[10px]">Office Verification Notes *</label>
@@ -984,7 +1101,7 @@ export const AdminDashboardPage: React.FC = () => {
                       </div>
 
                       {/* Action buttons */}
-                      <div className="flex justify-end gap-3 pt-2">
+                      <div className="flex flex-wrap justify-end gap-3 pt-2">
                         <button
                           onClick={async () => {
                             const notes = verificationNotes[claim.id] || 'Manually verified in office.';
@@ -993,7 +1110,7 @@ export const AdminDashboardPage: React.FC = () => {
                           className="px-5 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-bold rounded-xl shadow transition-all flex items-center gap-1.5"
                         >
                           <Check size={14} strokeWidth={3} />
-                          Approve & Issue Release Code
+                          Approve & Release
                         </button>
                         <button
                           onClick={async () => {
@@ -1006,6 +1123,16 @@ export const AdminDashboardPage: React.FC = () => {
                         >
                           <X size={14} strokeWidth={3} />
                           Reject Claim
+                        </button>
+                        <button
+                          onClick={async () => {
+                            const notes = verificationNotes[claim.id] || 'Additional verification requested.';
+                            alert(`Requested additional verification for Claim #${claim.id}. Notes: "${notes}". Student has been notified to present additional proof at Safety Office Room 102.`);
+                          }}
+                          className="px-5 py-2.5 bg-amber-50 hover:bg-amber-500 text-amber-600 hover:text-white border border-amber-200 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5"
+                        >
+                          <HelpCircle size={14} />
+                          Request Info
                         </button>
                       </div>
                     </div>
@@ -1116,55 +1243,16 @@ export const AdminDashboardPage: React.FC = () => {
         </AnimatePresence>
       </main>
 
-      {/* BARCODE MODAL SIMULATOR */}
+      {/* BARCODE MODAL */}
       <AnimatePresence>
         {showBarcodeModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setShowBarcodeModal(false)}
-              className="absolute inset-0 bg-neutral-950/40 backdrop-blur-sm"
-            />
-
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="relative w-full max-w-md bg-white border border-borderMain rounded-3xl p-6 shadow-premium z-10 space-y-4 text-left"
-            >
-              <div>
-                <h4 className="font-sans font-extrabold text-sm text-textMain uppercase tracking-wider flex items-center gap-1.5">
-                  <Scan size={14} className="text-primary" />
-                  <span>Barcode ID Card Scanner Simulator</span>
-                </h4>
-                <p className="text-[11px] text-textMuted mt-1">
-                  Click a student below to simulate swiping their barcode card through the scanner.
-                </p>
-              </div>
-
-              <div className="flex flex-col gap-2 pt-2">
-                {[
-                  { name: 'Sajit Kumar', code: '984512', dept: 'CS' },
-                  { name: 'Sarah Chen', code: '887213', dept: 'IT' },
-                  { name: 'Marcus Miller', code: '445123', dept: 'Mech' }
-                ].map(sim => (
-                  <button
-                    key={sim.code}
-                    onClick={() => handleBarcodeSimulate(sim.code)}
-                    className="p-3 bg-bgMain border border-borderMain hover:border-primary/50 hover:bg-primary-light/10 rounded-xl text-xs text-textMain font-bold transition-all text-left flex justify-between items-center"
-                  >
-                    <div>
-                      <div>{sim.name}</div>
-                      <div className="text-[10px] text-textMuted font-medium">Dept: {sim.dept}</div>
-                    </div>
-                    <span className="font-mono text-primary text-[10px]">Code: {sim.code}</span>
-                  </button>
-                ))}
-              </div>
-            </motion.div>
-          </div>
+          <BarcodeScanner
+            onScanSuccess={handleBarcodeScanSuccess}
+            onClose={() => {
+              setShowBarcodeModal(false);
+              setScannerContext(null);
+            }}
+          />
         )}
       </AnimatePresence>
 

@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { Upload, X, AlertCircle, CheckCircle2, Loader2 } from 'lucide-react';
+import { Upload, X, AlertCircle, CheckCircle2, Loader2, Camera } from 'lucide-react';
 
 interface ImageUploadProps {
   files: File[];
@@ -22,6 +22,7 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [compressing, setCompressing] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
 
   // Compress image to JPEG under 1200px max dimension using HTML5 Canvas
   const compressImage = (file: File): Promise<File> => {
@@ -92,7 +93,7 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
       }
 
       if (file.size > maxSizeMB * 1024 * 1024) {
-        setErrorMsg(`File too large: ${file.name}. Maximum size is ${maxSizeMB}MB.`);
+        setErrorMsg("Image size exceeds the 5 MB limit.");
         continue;
       }
 
@@ -145,6 +146,11 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
     fileInputRef.current?.click();
   };
 
+  const triggerCameraInput = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    cameraInputRef.current?.click();
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
@@ -166,12 +172,13 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
         onDragLeave={onDrag}
         onDrop={onDrop}
         onClick={triggerInput}
-        className={`border-2 border-dashed rounded-2xl p-6 text-center cursor-pointer transition-all flex flex-col items-center justify-center min-h-[140px] ${
+        className={`border-2 border-dashed rounded-2xl p-6 text-center cursor-pointer transition-all flex flex-col items-center justify-center min-h-[160px] ${
           dragActive
             ? "border-primary bg-primary-light/10 scale-[0.99]"
             : "border-borderMain hover:border-primary/50 bg-bgMain hover:bg-white"
         }`}
       >
+        {/* File input for browsing */}
         <input
           ref={fileInputRef}
           type="file"
@@ -180,15 +187,45 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
           className="hidden"
           onChange={onFileSelect}
         />
+
+        {/* Camera input for mobile device camera */}
+        <input
+          ref={cameraInputRef}
+          type="file"
+          accept="image/*"
+          capture="environment"
+          className="hidden"
+          onChange={onFileSelect}
+        />
         
-        <div className="p-3 bg-white border border-borderMain/50 rounded-xl shadow-soft mb-2.5 transition-transform group-hover:scale-105">
+        <div className="p-3 bg-white border border-borderMain/50 rounded-xl shadow-soft mb-2 transition-transform group-hover:scale-105">
           <Upload className="text-primary" size={20} />
         </div>
 
         <p className="text-xs text-textMain font-bold">
-          Drag & Drop files here, or <span className="text-primary hover:underline">Browse Files</span>
+          Drag & Drop files here, or use options below:
         </p>
-        <p className="text-[9px] text-textMuted mt-1">
+
+        {/* Action Buttons */}
+        <div className="flex gap-3 w-full max-w-xs mt-3.5">
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); triggerInput(); }}
+            className="flex-1 py-2 px-3 bg-white border border-borderMain hover:bg-bgMain text-textMain text-[11px] font-bold rounded-xl shadow-sm transition-all"
+          >
+            Browse Files
+          </button>
+          <button
+            type="button"
+            onClick={triggerCameraInput}
+            className="flex-1 py-2 px-3 bg-primary hover:bg-primary-hover text-white text-[11px] font-bold rounded-xl shadow-sm transition-all flex items-center justify-center gap-1.5"
+          >
+            <Camera size={12} />
+            Take Photo
+          </button>
+        </div>
+
+        <p className="text-[9px] text-textMuted mt-3.5">
           Supports JPG, PNG, WEBP formats up to {maxSizeMB}MB each. Maximum {maxFiles} images.
         </p>
       </div>

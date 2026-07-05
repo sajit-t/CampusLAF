@@ -37,6 +37,7 @@ export interface Item {
   images: string[];
   created_at?: string;
   matchScore?: number | null; // Added from intelligent search
+  type?: 'lost' | 'found';
 }
 
 export interface Claim {
@@ -93,6 +94,10 @@ interface AppContextType {
   setShowLoginModal: (show: boolean) => void;
   showReportGuidance: boolean;
   setShowReportGuidance: (show: boolean) => void;
+  studentActiveTab: string;
+  setStudentActiveTab: (tab: string) => void;
+  reportType: 'lost' | 'found';
+  setReportType: (type: 'lost' | 'found') => void;
 
   // Setters/Navigators
   setPage: (page: string) => void;
@@ -117,7 +122,7 @@ interface AppContextType {
   fetchStudentByRoll: (roll: string) => Promise<Student | null>;
 
   // Item Actions
-  registerItem: (itemData: Omit<Item, 'id' | 'status' | 'images'>, files: File[]) => Promise<boolean>;
+  registerItem: (itemData: Omit<Item, 'id' | 'status' | 'images'> & { type?: 'lost' | 'found' }, files: File[]) => Promise<boolean>;
   editItem: (id: string, updateFields: Partial<Item>) => Promise<boolean>;
   deleteItem: (id: string) => Promise<boolean>;
 
@@ -147,6 +152,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [adminActiveTab, setAdminActiveTab] = useState<string>('dashboard');
   const [showLoginModal, setShowLoginModal] = useState<boolean>(false);
   const [showReportGuidance, setShowReportGuidance] = useState<boolean>(false);
+  const [studentActiveTab, setStudentActiveTab] = useState<string>('dashboard');
+  const [reportType, setReportType] = useState<'lost' | 'found'>('lost');
 
   // Helper fetch request
   const apiRequest = async (url: string, method = 'GET', body: any = null, isMultipart = false) => {
@@ -272,7 +279,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     try {
       const url = searchQuery ? `/api/items/search?q=${encodeURIComponent(searchQuery)}` : '/api/items/search';
       const data = await apiRequest(url);
-      setItems(data);
+      const itemsWithType = data.map((item: any) => ({
+        ...item,
+        type: item.notes?.startsWith('[LOST]') ? 'lost' : 'found'
+      }));
+      setItems(itemsWithType);
     } catch (err: any) {
       setErrorMsg(err.message);
     }
@@ -383,7 +394,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   // 4. Lost Items Actions
-  const registerItem = async (itemData: Omit<Item, 'id' | 'status' | 'images'>, files: File[]): Promise<boolean> => {
+  const registerItem = async (itemData: Omit<Item, 'id' | 'status' | 'images'> & { type?: 'lost' | 'found' }, files: File[]): Promise<boolean> => {
     setErrorMsg(null);
     try {
       let imageUrls: string[] = [];
@@ -395,9 +406,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         imageUrls = uploadRes.urls;
       }
 
+      const prefix = itemData.type === 'lost' ? '[LOST]' : '[FOUND]';
+      const cleanNotes = itemData.notes || '';
+
       // 2. Submit lost item payload
+      const { type, ...restItemData } = itemData;
       const payload = {
-        ...itemData,
+        ...restItemData,
+        notes: `${prefix} ${cleanNotes}`.trim(),
         images: imageUrls.length > 0 ? imageUrls : ['/uploads/placeholder.jpg']
       };
       await apiRequest('/api/items', 'POST', payload);
@@ -415,7 +431,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const editItem = async (id: string, updateFields: Partial<Item>): Promise<boolean> => {
     setErrorMsg(null);
     try {
-      await apiRequest(`/api/items/${id}`, 'PUT', updateFields);
+      let payload = { ...updateFields };
+      if (updateFields.type) {
+        const prefix = updateFields.type === 'lost' ? '[LOST]' : '[FOUND]';
+        const cleanNotes = (updateFields.notes || '').replace(/^\[(LOST|FOUND)\]\s*/, '');
+        payload.notes = `${prefix} ${cleanNotes}`.trim();
+        delete payload.type;
+      }
+      await apiRequest(`/api/items/${id}`, 'PUT', payload);
       fetchItems();
       fetchAnalytics();
       return true;
@@ -517,6 +540,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setShowLoginModal,
       showReportGuidance,
       setShowReportGuidance,
+      studentActiveTab,
+      setStudentActiveTab,
+      reportType,
+      setReportType,
       setPage,
       setSelectedItemId,
       clearError,

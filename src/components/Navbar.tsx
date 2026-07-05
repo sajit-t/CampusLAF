@@ -16,6 +16,7 @@ export const Navbar: React.FC = () => {
     clearError,
     adminActiveTab,
     setAdminActiveTab,
+    setStudentActiveTab,
     showLoginModal,
     setShowLoginModal,
     showReportGuidance,
@@ -147,7 +148,8 @@ export const Navbar: React.FC = () => {
           setAdminActiveTab('receive');
           setPage('admin');
         } else {
-          setShowReportGuidance(true);
+          setStudentActiveTab('report');
+          setPage('dashboard');
         }
       } 
     }

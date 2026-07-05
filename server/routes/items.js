@@ -243,8 +243,8 @@ router.get('/:id', authenticateToken, async (req, res) => {
   }
 });
 
-// 4. POST /api/items - Register New Lost Item (Admins only)
-router.post('/', authenticateToken, authorizeRole(['admin', 'super_admin']), async (req, res) => {
+// 4. POST /api/items - Register New Lost Item (Student & Admin accessible)
+router.post('/', authenticateToken, authorizeRole(['student', 'admin', 'super_admin']), async (req, res) => {
   const {
     found_by_roll_number,
     category,
@@ -267,17 +267,20 @@ router.post('/', authenticateToken, authorizeRole(['admin', 'super_admin']), asy
     return res.status(400).json({ error: 'Primary item details (name, category, description, location, date) are required' });
   }
 
+  const isUserAdmin = ['admin', 'super_admin'].includes(req.user.role);
+  const targetRoll = isUserAdmin ? found_by_roll_number : req.user.roll_number;
+
   try {
     // If student roll number provided, verify it exists
-    if (found_by_roll_number) {
-      const student = await db.students.findByRoll(found_by_roll_number);
+    if (targetRoll) {
+      const student = await db.students.findByRoll(targetRoll);
       if (!student) {
         return res.status(400).json({ error: 'Student Roll Number is invalid' });
       }
     }
 
     const newItem = await db.items.create({
-      found_by_roll_number: found_by_roll_number || null,
+      found_by_roll_number: targetRoll || null,
       category,
       item_name,
       brand: brand || '',
@@ -290,7 +293,7 @@ router.post('/', authenticateToken, authorizeRole(['admin', 'super_admin']), asy
       room: room || '',
       found_date,
       found_time: found_time || null,
-      received_by_admin: req.user.id,
+      received_by_admin: isUserAdmin ? req.user.id : null,
       status: 'Waiting for Owner',
       notes: notes || '',
       images: images || []
@@ -299,7 +302,7 @@ router.post('/', authenticateToken, authorizeRole(['admin', 'super_admin']), asy
     // Log action
     await db.logs.create({
       performed_by: req.user.id,
-      action: 'REGISTER_LOST_ITEM',
+      action: isUserAdmin ? 'REGISTER_LOST_ITEM' : 'STUDENT_REPORT_ITEM',
       affected_record_table: 'lost_items',
       affected_record_id: newItem.id || 'new',
       details: { name: item_name, category }

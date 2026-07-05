@@ -3,6 +3,7 @@ import { useApp } from '../context/AppContext';
 import type { Item } from '../context/AppContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import { predefinedLocations } from './AdminDashboardPage';
+import { ImageUpload } from '../components/ImageUpload';
 import {
   LayoutDashboard,
   Search,
@@ -14,7 +15,10 @@ import {
   Sparkles,
   Phone,
   Mail,
-  Camera
+  Camera,
+  PlusCircle,
+  Loader2,
+  CheckCircle2
 } from 'lucide-react';
 
 export const DashboardPage: React.FC = () => {
@@ -27,15 +31,35 @@ export const DashboardPage: React.FC = () => {
     setSelectedItemId,
     fetchItems,
     editStudent,
-    logout
+    logout,
+    studentActiveTab: activeTab,
+    setStudentActiveTab: setActiveTab,
+    reportType,
+    setReportType,
+    registerItem
   } = useApp();
 
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'lost' | 'claims' | 'profile' | 'settings'>('dashboard');
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('All');
   const [locationFilter, setLocationFilter] = useState('All');
+  const [typeFilter, setTypeFilter] = useState<'All' | 'lost' | 'found'>('All');
+  const [sortBy, setSortBy] = useState<'newest' | 'oldest' | 'name'>('newest');
+
+  // Student Report form states
+  const [repName, setRepName] = useState('');
+  const [repCategory, setRepCategory] = useState('Electronics');
+  const [repBrand, setRepBrand] = useState('');
+  const [repColor, setRepColor] = useState('');
+  const [repDate, setRepDate] = useState(new Date().toISOString().split('T')[0]);
+  const [repLocation, setRepLocation] = useState('Library');
+  const [repDesc, setRepDesc] = useState('');
+  const [repNotes, setRepNotes] = useState('');
+  const [repFiles, setRepFiles] = useState<File[]>([]);
+  const [repSubmitting, setRepSubmitting] = useState(false);
+  const [studentSuccessMsg, setStudentSuccessMsg] = useState(false);
 
   const filteredCatalogItems = items.filter(item => {
+    const typeMatch = typeFilter === 'All' || item.type === typeFilter;
     const categoryMatch = categoryFilter === 'All' || item.category === categoryFilter;
     let locationMatch = false;
     if (locationFilter === 'All') {
@@ -45,7 +69,20 @@ export const DashboardPage: React.FC = () => {
     } else {
       locationMatch = item.found_location === locationFilter;
     }
-    return categoryMatch && locationMatch;
+    return typeMatch && categoryMatch && locationMatch;
+  });
+
+  const sortedCatalogItems = [...filteredCatalogItems].sort((a, b) => {
+    if (sortBy === 'newest') {
+      return new Date(b.found_date).getTime() - new Date(a.found_date).getTime();
+    }
+    if (sortBy === 'oldest') {
+      return new Date(a.found_date).getTime() - new Date(b.found_date).getTime();
+    }
+    if (sortBy === 'name') {
+      return a.item_name.localeCompare(b.item_name);
+    }
+    return 0;
   });
   
   // Profile Form States
@@ -71,6 +108,51 @@ export const DashboardPage: React.FC = () => {
   const handleItemClick = (itemId: string) => {
     setSelectedItemId(itemId);
     setPage('item-details');
+  };
+
+  const handleStudentReportSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!repName || !repDesc || !repLocation) {
+      alert('Please fill out all required fields.');
+      return;
+    }
+    setRepSubmitting(true);
+    try {
+      const payload = {
+        category: repCategory,
+        item_name: repName,
+        brand: repBrand,
+        color: repColor,
+        description: repDesc,
+        estimated_value: 0,
+        found_location: repLocation,
+        found_date: repDate,
+        notes: repNotes,
+        type: reportType
+      };
+      
+      const success = await registerItem(payload, repFiles);
+      if (success) {
+        setStudentSuccessMsg(true);
+        // Reset form
+        setRepName('');
+        setRepCategory('Electronics');
+        setRepBrand('');
+        setRepColor('');
+        setRepDate(new Date().toISOString().split('T')[0]);
+        setRepLocation('Library');
+        setRepDesc('');
+        setRepNotes('');
+        setRepFiles([]);
+      } else {
+        alert('Failed to submit report. Please try again.');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Error submitting report.');
+    } finally {
+      setRepSubmitting(false);
+    }
   };
 
   const handleSaveProfile = async (e: React.FormEvent) => {
@@ -117,7 +199,7 @@ export const DashboardPage: React.FC = () => {
   const claimedItems = items.filter(i => i.status === 'Claimed & Collected');
 
   interface MenuItem {
-    id: 'dashboard' | 'lost' | 'claims' | 'profile' | 'settings';
+    id: 'dashboard' | 'lost' | 'claims' | 'report' | 'profile' | 'settings';
     label: string;
     icon: any;
     badge?: number;
@@ -125,7 +207,8 @@ export const DashboardPage: React.FC = () => {
 
   const menuItems: MenuItem[] = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'lost', label: 'Lost Items Directory', icon: Bookmark, badge: waitingItems.length + claimRequestedItems.length },
+    { id: 'lost', label: 'Browse Catalog', icon: Bookmark, badge: waitingItems.length + claimRequestedItems.length },
+    { id: 'report', label: 'Report Lost / Found', icon: PlusCircle },
     { id: 'claims', label: 'My Claims History', icon: FileCheck, badge: myClaimsCount > 0 ? myClaimsCount : undefined },
     { id: 'profile', label: 'My Profile', icon: User },
     { id: 'settings', label: 'Portal Configs', icon: Settings },
@@ -354,14 +437,15 @@ export const DashboardPage: React.FC = () => {
               className="space-y-6 text-left"
             >
               <div className="flex justify-between items-center">
-                <h3 className="font-sans font-bold text-lg text-textMain">Campus Lost Items Catalog</h3>
-                <span className="text-xs text-textMuted">{filteredCatalogItems.length} items active</span>
+                <h3 className="font-sans font-bold text-lg text-textMain">Campus Browse Catalog</h3>
+                <span className="text-xs text-textMuted">{sortedCatalogItems.length} items active</span>
               </div>
 
               {/* Filtering Controls */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-white border border-borderMain p-4 rounded-2xl shadow-soft text-left w-full">
+              <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 bg-white border border-borderMain p-4 rounded-2xl shadow-soft text-left w-full">
+                {/* Category */}
                 <div className="space-y-1">
-                  <label className="text-[9px] font-bold text-textMuted uppercase tracking-wider">Filter by Category</label>
+                  <label className="text-[9px] font-bold text-textMuted uppercase tracking-wider">Category</label>
                   <select
                     value={categoryFilter}
                     onChange={(e) => setCategoryFilter(e.target.value)}
@@ -376,8 +460,9 @@ export const DashboardPage: React.FC = () => {
                   </select>
                 </div>
 
+                {/* Location */}
                 <div className="space-y-1">
-                  <label className="text-[9px] font-bold text-textMuted uppercase tracking-wider">Filter by Campus Location</label>
+                  <label className="text-[9px] font-bold text-textMuted uppercase tracking-wider">Campus Location</label>
                   <select
                     value={locationFilter}
                     onChange={(e) => setLocationFilter(e.target.value)}
@@ -390,15 +475,43 @@ export const DashboardPage: React.FC = () => {
                     <option value="Custom">Custom / Other Locations</option>
                   </select>
                 </div>
+
+                {/* Type Filter (Lost vs Found) */}
+                <div className="space-y-1">
+                  <label className="text-[9px] font-bold text-textMuted uppercase tracking-wider">Report Type</label>
+                  <select
+                    value={typeFilter}
+                    onChange={(e) => setTypeFilter(e.target.value as any)}
+                    className="w-full px-3 py-2 text-xs bg-bgMain border border-borderMain rounded-xl focus:outline-none focus:ring-1 focus:ring-primary"
+                  >
+                    <option value="All">All Reports</option>
+                    <option value="lost">Lost Reports</option>
+                    <option value="found">Found Reports</option>
+                  </select>
+                </div>
+
+                {/* Sort By */}
+                <div className="space-y-1">
+                  <label className="text-[9px] font-bold text-textMuted uppercase tracking-wider">Sort By</label>
+                  <select
+                    value={sortBy}
+                    onChange={(e) => setSortBy(e.target.value as any)}
+                    className="w-full px-3 py-2 text-xs bg-bgMain border border-borderMain rounded-xl focus:outline-none focus:ring-1 focus:ring-primary"
+                  >
+                    <option value="newest">Newest Date</option>
+                    <option value="oldest">Oldest Date</option>
+                    <option value="name">Name (A-Z)</option>
+                  </select>
+                </div>
               </div>
 
-              {filteredCatalogItems.length === 0 ? (
+              {sortedCatalogItems.length === 0 ? (
                 <div className="py-20 bg-white border border-borderMain/60 rounded-2xl text-center text-xs text-textMuted w-full">
-                  No items active in local catalog matching search criteria.
+                  No lost or found items match the search criteria.
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  {filteredCatalogItems.map(item => (
+                  {sortedCatalogItems.map(item => (
                     <div
                       key={item.id}
                       onClick={() => handleItemClick(item.id)}
@@ -406,6 +519,16 @@ export const DashboardPage: React.FC = () => {
                     >
                       <div className="relative h-44 bg-borderMain/10">
                         <img src={item.images && item.images.length > 0 ? item.images[0] : '/uploads/placeholder.jpg'} alt={item.item_name} className="w-full h-full object-cover" />
+                        
+                        {/* Type Indicator top left */}
+                        <span className={`absolute top-3 left-3 text-[9px] font-extrabold px-2.5 py-0.5 rounded-full border shadow-sm ${
+                          item.type === 'lost'
+                            ? 'bg-rose-50 border-rose-100 text-rose-600'
+                            : 'bg-emerald-50 border-emerald-100 text-emerald-600'
+                        }`}>
+                          {item.type?.toUpperCase()}
+                        </span>
+
                         <span className={`absolute top-3 right-3 text-[10px] font-bold px-2 py-0.5 rounded-full ${
                           item.status === 'Claimed & Collected'
                             ? 'bg-emerald-100 text-emerald-600'
@@ -428,7 +551,7 @@ export const DashboardPage: React.FC = () => {
                         <h4 className="font-sans font-bold text-sm text-textMain truncate leading-tight">{item.item_name}</h4>
                         <p className="text-[11px] text-textMuted line-clamp-2 leading-relaxed min-h-[32px]">{item.description}</p>
                         <div className="flex justify-between items-center text-[10px] text-textMuted pt-2 border-t border-borderMain/50">
-                          <span>{item.found_location}</span>
+                          <span className="flex items-center gap-1"><MapPin size={10} /> {item.found_location}</span>
                           <span>{item.found_date}</span>
                         </div>
                       </div>
@@ -498,6 +621,213 @@ export const DashboardPage: React.FC = () => {
                   </div>
                 )}
               </div>
+            </motion.div>
+          )}
+
+          {activeTab === 'report' && (
+            <motion.div
+              key="report-tab"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="space-y-6 text-left max-w-3xl"
+            >
+              <h3 className="font-sans font-bold text-lg text-textMain">Report Lost or Found Item</h3>
+              
+              {studentSuccessMsg ? (
+                <div className="p-6 bg-white border border-borderMain rounded-3xl text-center space-y-4 shadow-soft">
+                  <div className="w-12 h-12 bg-emerald-50 text-emerald-500 rounded-full flex items-center justify-center mx-auto">
+                    <CheckCircle2 size={24} />
+                  </div>
+                  <div className="space-y-1">
+                    <h4 className="font-bold text-sm text-textMain">Report Submitted Successfully</h4>
+                    <p className="text-xs text-textMuted leading-relaxed">
+                      Thank you for submitting your report. The Safety Office has logged this item. Please visit the physical office if you have any questions.
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setStudentSuccessMsg(false);
+                      setActiveTab('dashboard');
+                    }}
+                    className="px-5 py-2.5 bg-primary hover:bg-primary-hover text-white text-xs font-bold rounded-xl transition-all"
+                  >
+                    Go back to Dashboard
+                  </button>
+                </div>
+              ) : (
+                <form onSubmit={handleStudentReportSubmit} className="space-y-6 bg-white border border-borderMain rounded-3xl p-6 md:p-8 shadow-soft">
+                  <div className="space-y-4">
+                    {/* Report Type selector */}
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-bold text-textMain uppercase tracking-wider block">Report Type *</label>
+                      <div className="grid grid-cols-2 gap-3">
+                        <button
+                          type="button"
+                          onClick={() => setReportType('lost')}
+                          className={`py-3 px-4 text-xs font-bold rounded-xl border transition-all ${
+                            reportType === 'lost'
+                              ? 'bg-primary-light/10 border-primary text-primary shadow-sm'
+                              : 'bg-bgMain border-borderMain hover:bg-white text-textMuted'
+                          }`}
+                        >
+                          I lost this item
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setReportType('found')}
+                          className={`py-3 px-4 text-xs font-bold rounded-xl border transition-all ${
+                            reportType === 'found'
+                              ? 'bg-primary-light/10 border-primary text-primary shadow-sm'
+                              : 'bg-bgMain border-borderMain hover:bg-white text-textMuted'
+                          }`}
+                        >
+                          I found this item
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      {/* Item Name */}
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-textMain uppercase tracking-wider block">Item Name *</label>
+                        <input
+                          type="text"
+                          placeholder='e.g. Space Gray MacBook Pro 14"'
+                          value={repName}
+                          onChange={(e) => setRepName(e.target.value)}
+                          className="w-full px-3 py-2.5 text-xs bg-bgMain border border-borderMain rounded-xl focus:outline-none focus:ring-1 focus:ring-primary"
+                          required
+                        />
+                      </div>
+
+                      {/* Category */}
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-textMain uppercase tracking-wider block">Category *</label>
+                        <select
+                          value={repCategory}
+                          onChange={(e) => setRepCategory(e.target.value)}
+                          className="w-full px-3 py-2.5 text-xs bg-bgMain border border-borderMain rounded-xl focus:outline-none focus:ring-1 focus:ring-primary"
+                          required
+                        >
+                          <option value="Electronics">Electronics</option>
+                          <option value="Personal Items">Personal Items</option>
+                          <option value="Accessories">Accessories</option>
+                          <option value="Keys">Keys</option>
+                          <option value="Other">Other</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      {/* Brand */}
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-textMain uppercase tracking-wider block">Brand / Make</label>
+                        <input
+                          type="text"
+                          placeholder="e.g. Apple (Optional)"
+                          value={repBrand}
+                          onChange={(e) => setRepBrand(e.target.value)}
+                          className="w-full px-3 py-2.5 text-xs bg-bgMain border border-borderMain rounded-xl focus:outline-none focus:ring-1 focus:ring-primary"
+                        />
+                      </div>
+
+                      {/* Color */}
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-textMain uppercase tracking-wider block">Color</label>
+                        <input
+                          type="text"
+                          placeholder="e.g. Space Gray (Optional)"
+                          value={repColor}
+                          onChange={(e) => setRepColor(e.target.value)}
+                          className="w-full px-3 py-2.5 text-xs bg-bgMain border border-borderMain rounded-xl focus:outline-none focus:ring-1 focus:ring-primary"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      {/* Date */}
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-textMain uppercase tracking-wider block">Date Lost/Found *</label>
+                        <input
+                          type="date"
+                          value={repDate}
+                          onChange={(e) => setRepDate(e.target.value)}
+                          className="w-full px-3 py-2.5 text-xs bg-bgMain border border-borderMain rounded-xl focus:outline-none focus:ring-1 focus:ring-primary"
+                          required
+                        />
+                      </div>
+
+                      {/* Location */}
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-textMain uppercase tracking-wider block">Campus Location *</label>
+                        <select
+                          value={repLocation}
+                          onChange={(e) => setRepLocation(e.target.value)}
+                          className="w-full px-3 py-2.5 text-xs bg-bgMain border border-borderMain rounded-xl focus:outline-none focus:ring-1 focus:ring-primary"
+                          required
+                        >
+                          {predefinedLocations.map(loc => (
+                            <option key={loc} value={loc}>{loc}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+
+                    {/* Description */}
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-textMain uppercase tracking-wider block">Description *</label>
+                      <textarea
+                        rows={3}
+                        placeholder="Describe unique markings, stickers, serial numbers, case type, or specific conditions..."
+                        value={repDesc}
+                        onChange={(e) => setRepDesc(e.target.value)}
+                        className="w-full px-3 py-2 text-xs bg-bgMain border border-borderMain rounded-xl focus:outline-none focus:ring-1 focus:ring-primary resize-none"
+                        required
+                      />
+                    </div>
+
+                    {/* Notes */}
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-textMain uppercase tracking-wider block">Internal Notes (Optional)</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Left on the third row bench near the projector."
+                        value={repNotes}
+                        onChange={(e) => setRepNotes(e.target.value)}
+                        className="w-full px-3 py-2 text-xs bg-bgMain border border-borderMain rounded-xl focus:outline-none focus:ring-1 focus:ring-primary"
+                      />
+                    </div>
+
+                    {/* Image Upload Component */}
+                    <div className="pt-2 border-t border-borderMain/50">
+                      <ImageUpload
+                        files={repFiles}
+                        onChange={setRepFiles}
+                        maxFiles={5}
+                        maxSizeMB={5}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end gap-3 pt-2">
+                    <button
+                      type="submit"
+                      disabled={repSubmitting}
+                      className="px-6 py-3 bg-primary hover:bg-primary-hover text-white text-xs font-bold rounded-xl transition-all shadow-md disabled:opacity-50 flex items-center justify-center gap-1.5"
+                    >
+                      {repSubmitting ? (
+                        <>
+                          <Loader2 className="animate-spin" size={13} />
+                          <span>Submitting...</span>
+                        </>
+                      ) : (
+                        <span>Submit Report</span>
+                      )}
+                    </button>
+                  </div>
+                </form>
+              )}
             </motion.div>
           )}
 
